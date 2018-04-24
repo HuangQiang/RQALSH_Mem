@@ -1,4 +1,4 @@
-# RQALSH: Reverse Query-Aware Locality-Sensitive Hashing Scheme
+# RQALSH_Mem: Memory Version of RQALSH and RQALSH*
 
 Version: 1.0.0
 
