@@ -12,7 +12,7 @@ This package is written in the C++ programming language. It provides two
 internal LSH schemes RQALSH and RQALSH* for c-Approximate Furthest Neighbor 
 (or simply c-AFN) search under Euclidean distance.
 
-How to use this Package?
+Usage
 --------
 
 We provide a Makefile and a script (i.e., run_mnist.sh) as a running example 
@@ -34,7 +34,7 @@ and P53 we used can be downloaded from the following links:
 * P53: https://drive.google.com/open?id=1hjGvcq29WsgHpGoz0vCdCYAUR453aY29
 
 
-Authors
+Author
 --------
 
 * **Qiang Huang**
