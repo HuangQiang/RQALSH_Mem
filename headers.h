@@ -44,8 +44,11 @@
 #include "util.h"
 #include "random.h"
 #include "pri_queue.h"
+#include "qdafn.h"
+#include "drusilla_select.h"
 #include "rqalsh.h"
 #include "rqalsh_star.h"
+#include "ml_rqalsh.h"
 #include "afn.h"
 
 using namespace std;

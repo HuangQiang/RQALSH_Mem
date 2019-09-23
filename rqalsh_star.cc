@@ -1,46 +1,11 @@
 #include "headers.h"
 
 // -----------------------------------------------------------------------------
-RQALSH_Star::RQALSH_Star()			// constructor
-{
-	n_pts_       = -1;
-	dim_         = -1;
-	L_           = -1;
-	M_           = -1;
-	beta_        = -1;
-	delta_       = -1.0f;
-	appr_ratio_  = -1.0f;
-	sample_size_ = -1;
-	sample_id_   = NULL;
-	sample_data_ = NULL;
-	lsh_         = NULL;
-}
-
-// -----------------------------------------------------------------------------
-RQALSH_Star::~RQALSH_Star()			// destructor
-{
-	if (sample_id_ != NULL) {
-		delete[] sample_id_; sample_id_ = NULL;
-	}
-	if (sample_data_ != NULL) {
-		for (int i = 0; i < sample_size_; ++i) {
-			delete[] sample_data_[i]; sample_data_[i] = NULL;
-		}
-		delete[] sample_data_; sample_data_ = NULL;
-	}
-	if (lsh_ != NULL) {
-		delete lsh_; lsh_ = NULL;
-	}
-}
-
-// -----------------------------------------------------------------------------
-int RQALSH_Star::build(				// build index	
+RQALSH_STAR::RQALSH_STAR(			// constructor
 	int   n,							// cardinality
 	int   d,							// dimensionality
-	int   L,							// number of projection
+	int   L,							// number of proj
 	int   M,							// number of candidates
-	int   beta,							// false positive percentage
-	float delta,						// error probability
 	float ratio,						// approximation ratio
 	const float **data)					// data objects
 {
@@ -51,67 +16,76 @@ int RQALSH_Star::build(				// build index
 	dim_        = d;
 	L_          = L;
 	M_          = M;
-	beta_       = beta;
-	delta_      = delta;
 	appr_ratio_ = ratio;
+	n_cand_     = L_ * M_;
 
 	// -------------------------------------------------------------------------
 	//  build hash tables (bulkloading)
 	// -------------------------------------------------------------------------
 	bulkload(data);
-	// display();
-	
-	return 0;
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_Star::bulkload(			// bulkloading for each block
+RQALSH_STAR::~RQALSH_STAR()			// destructor
+{
+	delete[] cand_id_; cand_id_ = NULL;
+	for (int i = 0; i < n_cand_; ++i) {
+		delete[] cand_data_[i]; cand_data_[i] = NULL;
+	}
+	delete[] cand_data_; cand_data_ = NULL;
+
+	if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; }
+}
+
+// -----------------------------------------------------------------------------
+int RQALSH_STAR::bulkload(			// bulkloading for each block
 	const float **data)					// data objects
 {
 	// -------------------------------------------------------------------------
 	//  calculate shift data
 	// -------------------------------------------------------------------------
-	float *shift_data = new float[n_pts_ * dim_];
+	float **shift_data = new float*[n_pts_];
+	for (int i = 0; i < n_pts_; ++i) shift_data[i] = new float[dim_];
 	calc_shift_data(data, shift_data);
 
 	// -------------------------------------------------------------------------
 	//  get sample data from data dependent selection
 	// -------------------------------------------------------------------------
-	sample_size_ = L_ * M_;
-	sample_id_   = new int[sample_size_];
-	data_dependent_select(shift_data);
+	cand_id_ = new int[n_cand_];
+	data_dependent_select((const float **) shift_data);
 
-	sample_data_ = new float*[sample_size_];
-	for (int i = 0; i < sample_size_; ++i) {
-		int id = sample_id_[i];
+	cand_data_ = new float*[n_cand_];
+	for (int i = 0; i < n_cand_; ++i) {
+		int id = cand_id_[i];
 		
-		sample_data_[i] = new float[dim_];
+		cand_data_[i] = new float[dim_];
 		for (int j = 0; j < dim_; ++j) {
-			sample_data_[i][j] = data[id][j];
+			cand_data_[i][j] = data[id][j];
 		}
 	}
 
 	// -------------------------------------------------------------------------
 	//  build hash tables for objects from drusilla select using RQALSH
 	// -------------------------------------------------------------------------
-	if (sample_size_ > CANDIDATES) {
-		lsh_ = new RQALSH();
-		lsh_->build(sample_size_, dim_, beta_, delta_, appr_ratio_, 
-			(const float **) sample_data_);
+	if (n_cand_ > CANDIDATES) {
+		lsh_ = new RQALSH(n_cand_, dim_, appr_ratio_, (const float **) cand_data_);
 	}
 	
 	// -------------------------------------------------------------------------
 	//  release space
 	// -------------------------------------------------------------------------
+	for (int i = 0; i < n_pts_; ++i) {
+		delete[] shift_data[i]; shift_data[i] = NULL;
+	}
 	delete[] shift_data; shift_data = NULL;
 	
 	return 0;
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_Star::calc_shift_data( 	// calc shift data
+int RQALSH_STAR::calc_shift_data( 	// calc shift data
 	const float **data,					// data objects
-	float *shift_data)					// shift data objects (return)
+	float **shift_data)					// shift data objects (return)
 {
 	// -------------------------------------------------------------------------
 	//  calculate the centroid of data objects
@@ -130,9 +104,8 @@ int RQALSH_Star::calc_shift_data( 	// calc shift data
 	//  make a copy of data objects which move to the centroid of data objects
 	// -------------------------------------------------------------------------
 	for (int i = 0; i < n_pts_; ++i) {
-		int base = i * dim_;
 		for (int j = 0; j < dim_; ++j) {
-			shift_data[base + j] = data[i][j] - centroid[j];
+			shift_data[i][j] = data[i][j] - centroid[j];
 		}
 	}
 	
@@ -140,8 +113,8 @@ int RQALSH_Star::calc_shift_data( 	// calc shift data
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_Star::data_dependent_select( // drusilla select
-	const float *shift_data)			// shift data
+int RQALSH_STAR::data_dependent_select( // drusilla select
+	const float **shift_data)			// shift data
 {
 	// -------------------------------------------------------------------------
 	//  calc the norm of data objects and find the data object with max norm
@@ -151,66 +124,51 @@ int RQALSH_Star::data_dependent_select( // drusilla select
 	vector<float> norm(n_pts_, 0.0f);
 
 	for (int i = 0; i < n_pts_; ++i) {
-		int base = i * dim_;
-		for (int j = 0; j < dim_; ++j) {
-			float x = shift_data[base + j];
-			norm[i] += x * x;
-		}
-		norm[i] = sqrt(norm[i]);
-
+		norm[i] = sqrt(calc_inner_product(dim_, shift_data[i], shift_data[i]));
 		if (norm[i] > max_norm) {
 			max_norm = norm[i];
 			max_id   = i;
 		}
 	}
 
-	vector<bool>  close_angle(n_pts_);
-	vector<float> projection(dim_);
-	Result *score_pair = new Result[n_pts_];
-
+	float  *proj  = new float[dim_];
+	Result *score = new Result[n_pts_];
 	for (int i = 0; i < L_; ++i) {
 		// ---------------------------------------------------------------------
 		//  select the projection vector with largest norm and normalize it
 		// ---------------------------------------------------------------------
 		for (int j = 0; j < dim_; ++j) {
-			projection[j] = shift_data[max_id * dim_ + j] / norm[max_id];
+			proj[j] = shift_data[max_id][j] / norm[max_id];
 		}
 
 		// ---------------------------------------------------------------------
 		//  calculate offsets and distortions
 		// ---------------------------------------------------------------------
 		for (int j = 0; j < n_pts_; ++j) {
-			int base = j * dim_;
-
 			if (norm[j] >= 0.0f) {
-				float offset = 0.0F;
-				for (int k = 0; k < dim_; ++k) {
-					offset += (shift_data[base + k] * projection[k]);
-				}
+				float offset = calc_inner_product(dim_, shift_data[j], proj);
 
 				float distortion = 0.0F;
 				for (int k = 0; k < dim_; ++k) {
-					float x = shift_data[base + k] - offset * projection[k];
-					distortion += x * x;
+					distortion += SQR(shift_data[j][k] - offset * proj[k]);
 				}
-
-				score_pair[j].id_ = j;
-				score_pair[j].key_ = offset * offset - distortion;
+				score[j].id_  = j;
+				score[j].key_ = offset * offset - distortion;
 			}
 			else {
-				score_pair[j].id_ = j;
-				score_pair[j].key_ = MINREAL;
+				score[j].id_  = j;
+				score[j].key_ = MINREAL;
 			}
 		}
 
 		// ---------------------------------------------------------------------
 		//  collect the objects that are well-represented by this projection
 		// ---------------------------------------------------------------------
-		qsort(score_pair, n_pts_, sizeof(Result), ResultCompDesc);
+		qsort(score, n_pts_, sizeof(Result), ResultCompDesc);
 		for (int j = 0; j < M_; ++j) {
-			int id = score_pair[j].id_;
+			int id = score[j].id_;
 
-			sample_id_[i * M_ + j] = id;
+			cand_id_[i * M_ + j] = id;
 			norm[id] = -1.0f;
 		}
 
@@ -226,33 +184,27 @@ int RQALSH_Star::data_dependent_select( // drusilla select
 			}
 		}
 	}
-
-	// -------------------------------------------------------------------------
-	//  release space
-	// -------------------------------------------------------------------------
-	delete[] score_pair; score_pair = NULL;
+	delete[] proj;  proj  = NULL;
+	delete[] score; score = NULL;
 
 	return 0;
 }
 
 // -----------------------------------------------------------------------------
-void RQALSH_Star::display()			// display parameters
+void RQALSH_STAR::display()			// display parameters
 {
-	printf("Parameters of RQALSH_Star:\n");
-	printf("    n           = %d\n", n_pts_);
-	printf("    d           = %d\n", dim_);
-	printf("    L           = %d\n", L_);
-	printf("    M           = %d\n", M_);
-	printf("    beta        = %d\n", beta_);
-	printf("    delta       = %f\n", delta_);
-	printf("    c           = %f\n", appr_ratio_);
-	printf("    sample_size = %d\n", sample_size_);
-	printf("\n");
+	printf("Parameters of RQALSH*:\n");
+	printf("    n    = %d\n",   n_pts_);
+	printf("    d    = %d\n",   dim_);
+	printf("    L    = %d\n",   L_);
+	printf("    M    = %d\n",   M_);
+	printf("    c    = %.1f\n", appr_ratio_);
+	printf("    size = %d\n\n", n_cand_);
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_Star::kfn(				// c-k-AFN search
-	int top_k,							// top-k value
+int RQALSH_STAR::kfn(				// c-k-AFN search
+	int   top_k,						// top-k value
 	const float *query,					// query object
 	MaxK_List *list)					// k-FN results (return)
 {
@@ -260,19 +212,18 @@ int RQALSH_Star::kfn(				// c-k-AFN search
 	//  use index to speed up c-k-AFN search
 	// -------------------------------------------------------------------------
 	int candidates = CANDIDATES + top_k - 1;
-	if (sample_size_ > candidates) {
-		return lsh_->kfn(top_k, query, (const int*) sample_id_, list);
+	if (n_cand_ > candidates) {
+		return lsh_->kfn(top_k, query, (const int*) cand_id_, list);
 	}
 
 	// -------------------------------------------------------------------------
 	//  if the number of samples is small enough, linear scan directly
 	// -------------------------------------------------------------------------
-	for (int i = 0; i < sample_size_; ++i) {
-		int   id   = sample_id_[i];
-		float dist = calc_l2_dist(dim_, sample_data_[i], query);
+	for (int i = 0; i < n_cand_; ++i) {
+		int   id   = cand_id_[i];
+		float dist = calc_l2_dist(dim_, cand_data_[i], query);
 
 		list->insert(dist, id + 1);
 	}
-	
 	return 0;
 }

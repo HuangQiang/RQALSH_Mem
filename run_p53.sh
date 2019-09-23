@@ -6,47 +6,71 @@ rm *.o
 #  Parameters
 # ------------------------------------------------------------------------------
 dname=P53
-n=30159
-qn=1000
+n=30153
 d=5408
-beta=100
-delta=0.49
+qn=1000
 c=2.0
-
-dPath=./data/${dname}/${dname}
-oFolder=./results${c}/${dname}/
+dPath=data/${dname}/${dname}
+oPath=results${c}/${dname}/
 
 # ------------------------------------------------------------------------------
 #  Ground Truth 
 # ------------------------------------------------------------------------------
 ./rqalsh -alg 0 -n ${n} -qn ${qn} -d ${d} -ds ${dPath}.ds -qs ${dPath}.q \
-  -ts ${dPath}.fn2.0
+    -ts ${dPath}.fn${c}
 
 # ------------------------------------------------------------------------------
-#  RQALSH_Star
+#  ML_RQALSH
 # ------------------------------------------------------------------------------
-L_list=(2 3 4 6 8 12) 
-M_list=(12 8 6 4 3 2)
+./rqalsh -alg 1 -n ${n} -qn ${qn} -d ${d} -c ${c} -ds ${dPath}.ds \
+    -qs ${dPath}.q -ts ${dPath}.fn${c} -op ${oPath}
+
+# ------------------------------------------------------------------------------
+#  RQALSH*
+# ------------------------------------------------------------------------------
+L_list=(2 4 5 10 20 40 50 100)
+M_list=(100 50 40 20 10 5 4 2)
 length=`expr ${#L_list[*]} - 1`
 
 for j in $(seq 0 ${length})
 do 
-  L=${L_list[j]}
-  M=${M_list[j]}
+    L=${L_list[j]}
+    M=${M_list[j]}
 
-  ./rqalsh -alg 1 -n ${n} -qn ${qn} -d ${d} -L ${L} -M ${M} -beta ${beta} \
-    -delta ${delta} -c ${c} -ds ${dPath}.ds -qs ${dPath}.q -ts ${dPath}.fn2.0 \
-    -of ${oFolder}
+    ./rqalsh -alg 2 -n ${n} -qn ${qn} -d ${d} -L ${L} -M ${M} -c ${c} \
+        -ds ${dPath}.ds -qs ${dPath}.q -ts ${dPath}.fn${c} -op ${oPath}
 done
 
 # ------------------------------------------------------------------------------
 #  RQALSH
 # ------------------------------------------------------------------------------
-./rqalsh -alg 2 -n ${n} -qn ${qn} -d ${d} -beta ${beta} -delta ${delta} \
-  -c ${c} -ds ${dPath}.ds -qs ${dPath}.q -ts ${dPath}.fn2.0 -of ${oFolder}
+./rqalsh -alg 3 -n ${n} -qn ${qn} -d ${d} -c ${c} -ds ${dPath}.ds \
+    -qs ${dPath}.q -ts ${dPath}.fn${c} -op ${oPath}
+
+# ------------------------------------------------------------------------------
+#  Drusilla Select
+# ------------------------------------------------------------------------------
+L_list=(2 4 5 10 20 40 50 100)
+M_list=(100 50 40 20 10 5 4 2)
+length=`expr ${#L_list[*]} - 1`
+
+for j in $(seq 0 ${length})
+do 
+    L=${L_list[j]}
+    M=${M_list[j]}
+
+    ./rqalsh -alg 4 -n ${n} -qn ${qn} -d ${d} -L ${L} -M ${M} -ds ${dPath}.ds \
+        -qs ${dPath}.q -ts ${dPath}.fn${c} -op ${oPath}
+done
+
+# ------------------------------------------------------------------------------
+#  QDAFN
+# ------------------------------------------------------------------------------
+./rqalsh -alg 5 -n ${n} -qn ${qn} -d ${d} -L 0 -M 0 -c ${c} \
+    -ds ${dPath}.ds -qs ${dPath}.q -ts ${dPath}.fn${c} -op ${oPath}
 
 # ------------------------------------------------------------------------------
 #  Linear Scan
 # ------------------------------------------------------------------------------
-./rqalsh -alg 3 -n ${n} -qn ${qn} -d ${d} -ds ${dPath}.ds -qs ${dPath}.q \
-  -ts ${dPath}.fn2.0 -of ${oFolder}
+./rqalsh -alg 6 -n ${n} -qn ${qn} -d ${d} -ds ${dPath}.ds -qs ${dPath}.q \
+    -ts ${dPath}.fn${c} -op ${oPath}

@@ -1,38 +1,49 @@
 #ifndef __RQALSH_H
 #define __RQALSH_H
 
+#include <vector>
+using namespace std;
+
 class  MaxK_List;
 struct Result;
 
 // -----------------------------------------------------------------------------
-//  RQALSH: an LSH scheme for for high-dimensional c-k-AFN search
+//  RQALSH: basic data structure for high-dimensional c-k-AFN search
 // -----------------------------------------------------------------------------
 class RQALSH {
 public:
-	RQALSH();						// default constructor
-	~RQALSH();						// destructor
-
-	// -------------------------------------------------------------------------
-	int build(						// build index
+	RQALSH(							// constructor
 		int   n,						// cardinality
 		int   d,						// dimensionality
-		int   beta,						// false positive percentage
-		float delta,					// error probability
 		float ratio,					// approximation ratio
 		const float **data);			// data objects
 
 	// -------------------------------------------------------------------------
-	int kfn(						// k-FN search
-		int top_k,						// top-k value
-	    const float *query,				// query object
-		MaxK_List *list);				// k-FN results (return)
+	~RQALSH();						// destructor
 
 	// -------------------------------------------------------------------------
-	int kfn(						// k-FN search
-		int top_k,						// top-k value
+	void display();					// display parameters
+
+	// -------------------------------------------------------------------------
+	int kfn(						// c-k-AFN search
+		int   top_k,					// top-k value
+	    const float *query,				// query object
+		MaxK_List *list);				// c-k-AFN results (return)
+
+	// -------------------------------------------------------------------------
+	int kfn(						// c-k-AFN search (for RQALSH*)
+		int   top_k,					// top-k value
 	    const float *query,				// query object
 		const int *object_id,			// object id mapping
-		MaxK_List *list);				// k-FN results (return)
+		MaxK_List *list);				// c-k-AFN results (return)
+
+	// -------------------------------------------------------------------------
+	int kfn(						// c-k-AFN search (for ML_RQALSH)
+		int   top_k,					// top-k value
+		float R,						// limited search range
+		const float *query,				// input query
+		const int *object_id,			// objects id mapping
+		MaxK_List *list);				// c-k-AFN results (return)
 
 protected:
 	int   n_pts_;					// cardinality
@@ -55,35 +66,24 @@ protected:
 	int    *lpos_;					// left  position of hash table
 	int    *rpos_;					// right position of hash table
 	bool   *checked_;				// whether the data objects are checked
-	bool   *flag_;					// flag of bucket width
+	bool   *bucket_flag_;			// flag of bucket width
+	bool   *range_flag_;			// flag of search range
 	float  *q_val_;					// hash value of query				
-
-	// -------------------------------------------------------------------------
-	void calc_params();				// calc parameters of qalsh
 
 	// -------------------------------------------------------------------------
 	float calc_l2_prob(				// calc <p1> and <p2> for L_{2.0} distance
 		float x);						// x = w / (2.0 * r)
-
-	// -------------------------------------------------------------------------
-	void gen_hash_func();			// generate hash functions
 	
 	// -------------------------------------------------------------------------
 	int bulkload();					// build hash tables	
 
 	// -------------------------------------------------------------------------
 	float calc_hash_value(			// calc hash value
-		int table_id,					// hash table id
+		int   tid,						// hash table id
 		const float *data);				// one data object
 
 	// -------------------------------------------------------------------------
-	void display();					// display parameters
-
-	// -------------------------------------------------------------------------
-	float find_radius(				// find proper radius
-		const float *q_val,				// hash value of query
-		const int *lpos,				// left position of hash table
-		const int *rpos);				// right position of hash table
+	float find_radius();			// find proper radius
 };
 
 #endif // __RQALSH_H

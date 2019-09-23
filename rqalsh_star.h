@@ -5,24 +5,23 @@ class RQALSH;
 class MaxK_List;
 
 // -----------------------------------------------------------------------------
-//  RQALSH_Star is used to solve the problem of c-k-Approximate Furthest 
-//  Neighbor (c-k-AFN) search
+//  RQALSH_STAR is used for c-k-Approximate Furthest Neighbor (c-k-AFN) search
 // -----------------------------------------------------------------------------
-class RQALSH_Star {
+class RQALSH_STAR {
 public:
-	RQALSH_Star();
-	~RQALSH_Star();
-
-	// -------------------------------------------------------------------------
-	int build(						// build index
+	RQALSH_STAR(					// constructor
 		int   n,						// cardinality
 		int   d,						// dimensionality
 		int   L,						// number of projection
 		int   M,						// number of candidates
-		int   beta,						// false positive percentage
-		float delta,					// error probability
 		float ratio,					// approximation ratio
 		const float **data);			// data objects
+
+	// -------------------------------------------------------------------------
+	~RQALSH_STAR();					// destructor
+
+	// -------------------------------------------------------------------------
+	void display();			        // display parameters
 
 	// -------------------------------------------------------------------------
 	int kfn(						// c-k-AFN search
@@ -35,13 +34,11 @@ protected:
 	int    dim_;					// dimensionality
 	int    L_;						// number of projections
 	int    M_;						// number of candidates for each proj
-	int    beta_;					// false positive percentage
-	float  delta_;					// error probability
 	float  appr_ratio_;				// approximation ratio
 
-	int    sample_size_;			// number of sample data objects
-	int    *sample_id_;				// sample data objects id
-	float  **sample_data_;			// sample data objects
+	int    n_cand_;					// number of candidates
+	int    *cand_id_;				// candidate data objects id
+	float  **cand_data_;			// candidate data objects
 	RQALSH *lsh_;					// index of sample data objects
 
 	// -------------------------------------------------------------------------
@@ -51,14 +48,11 @@ protected:
 	// -------------------------------------------------------------------------
 	int calc_shift_data(			// calc shift data
 		const float **data,  			// data objects
-		float *shift_data);  			// shift data objects (return)
+		float **shift_data);  			// shift data objects (return)
 
 	// -------------------------------------------------------------------------
 	int data_dependent_select(		// data dependent selection
-		const float *shift_data);		// shift data objects
-
-	// -------------------------------------------------------------------------
-	void display();			        // display parameters
+		const float **shift_data);		// shift data objects
 };
 
 #endif // __RQALSH_STAR_H
