@@ -18,6 +18,7 @@ RQALSH_STAR::RQALSH_STAR(			// constructor
 	M_          = M;
 	appr_ratio_ = ratio;
 	n_cand_     = L_ * M_;
+	lsh_        = NULL;
 
 	// -------------------------------------------------------------------------
 	//  build hash tables (bulkloading)
@@ -38,7 +39,7 @@ RQALSH_STAR::~RQALSH_STAR()			// destructor
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_STAR::bulkload(			// bulkloading for each block
+void RQALSH_STAR::bulkload(			// bulkloading for each block
 	const float **data)					// data objects
 {
 	// -------------------------------------------------------------------------
@@ -46,7 +47,20 @@ int RQALSH_STAR::bulkload(			// bulkloading for each block
 	// -------------------------------------------------------------------------
 	float **shift_data = new float*[n_pts_];
 	for (int i = 0; i < n_pts_; ++i) shift_data[i] = new float[dim_];
-	calc_shift_data(data, shift_data);
+	
+	vector<float> centroid(dim_, 0.0f);
+	for (int i = 0; i < n_pts_; ++i) {
+		for (int j = 0; j < dim_; ++j) {
+			centroid[j] += data[i][j];
+		}
+	}
+	for (int i = 0; i < dim_; ++i) centroid[i] /= (float) n_pts_;
+
+	for (int i = 0; i < n_pts_; ++i) {
+		for (int j = 0; j < dim_; ++j) {
+			shift_data[i][j] = data[i][j] - centroid[j];
+		}
+	}
 
 	// -------------------------------------------------------------------------
 	//  get sample data from data dependent selection
@@ -67,7 +81,7 @@ int RQALSH_STAR::bulkload(			// bulkloading for each block
 	// -------------------------------------------------------------------------
 	//  build hash tables for objects from drusilla select using RQALSH
 	// -------------------------------------------------------------------------
-	if (n_cand_ > CANDIDATES) {
+	if (n_cand_ > N_THRESHOLD) {
 		lsh_ = new RQALSH(n_cand_, dim_, appr_ratio_, (const float **) cand_data_);
 	}
 	
@@ -78,38 +92,6 @@ int RQALSH_STAR::bulkload(			// bulkloading for each block
 		delete[] shift_data[i]; shift_data[i] = NULL;
 	}
 	delete[] shift_data; shift_data = NULL;
-	
-	return 0;
-}
-
-// -----------------------------------------------------------------------------
-int RQALSH_STAR::calc_shift_data( 	// calc shift data
-	const float **data,					// data objects
-	float **shift_data)					// shift data objects (return)
-{
-	// -------------------------------------------------------------------------
-	//  calculate the centroid of data objects
-	// -------------------------------------------------------------------------
-	vector<float> centroid(dim_, 0.0f);
-	for (int i = 0; i < n_pts_; ++i) {
-		for (int j = 0; j < dim_; ++j) {
-			centroid[j] += data[i][j];
-		}
-	}
-	for (int i = 0; i < dim_; ++i) {
-		centroid[i] /= (float) n_pts_;
-	}
-
-	// -------------------------------------------------------------------------
-	//  make a copy of data objects which move to the centroid of data objects
-	// -------------------------------------------------------------------------
-	for (int i = 0; i < n_pts_; ++i) {
-		for (int j = 0; j < dim_; ++j) {
-			shift_data[i][j] = data[i][j] - centroid[j];
-		}
-	}
-	
-	return 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -208,22 +190,14 @@ int RQALSH_STAR::kfn(				// c-k-AFN search
 	const float *query,					// query object
 	MaxK_List *list)					// k-FN results (return)
 {
-	// -------------------------------------------------------------------------
-	//  use index to speed up c-k-AFN search
-	// -------------------------------------------------------------------------
-	int candidates = CANDIDATES + top_k - 1;
-	if (n_cand_ > candidates) {
-		return lsh_->kfn(top_k, query, (const int*) cand_id_, list);
-	}
-
-	// -------------------------------------------------------------------------
-	//  if the number of samples is small enough, linear scan directly
-	// -------------------------------------------------------------------------
-	for (int i = 0; i < n_cand_; ++i) {
-		int   id   = cand_id_[i];
-		float dist = calc_l2_dist(dim_, cand_data_[i], query);
-
-		list->insert(dist, id + 1);
+	if (n_cand_ > N_THRESHOLD) {
+		lsh_->kfn(top_k, query, (const int*) cand_id_, list);
+	} else {
+		for (int i = 0; i < n_cand_; ++i) {
+			int   id   = cand_id_[i];
+			float dist = calc_l2_dist(dim_, cand_data_[i], query);
+			list->insert(dist, id + 1);
+		}
 	}
 	return 0;
 }

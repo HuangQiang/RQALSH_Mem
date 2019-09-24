@@ -42,13 +42,8 @@ protected:
 	RQALSH *lsh_;					// index of sample data objects
 
 	// -------------------------------------------------------------------------
-	int bulkload(					// bulkloading
+	void bulkload(					// bulkloading
 		const float **data);			// objects after moving to centroid
-
-	// -------------------------------------------------------------------------
-	int calc_shift_data(			// calc shift data
-		const float **data,  			// data objects
-		float **shift_data);  			// shift data objects (return)
 
 	// -------------------------------------------------------------------------
 	int data_dependent_select(		// data dependent selection
