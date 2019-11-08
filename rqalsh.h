@@ -1,11 +1,8 @@
 #ifndef __RQALSH_H
 #define __RQALSH_H
 
-#include <vector>
-using namespace std;
-
-class  MaxK_List;
 struct Result;
+class  MaxK_List;
 
 // -----------------------------------------------------------------------------
 //  RQALSH: basic data structure for high-dimensional c-k-AFN search

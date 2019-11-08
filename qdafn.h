@@ -1,6 +1,8 @@
 #ifndef __QDAFN_H
 #define __QDAFN_H
 
+class MaxK_List;
+
 // -----------------------------------------------------------------------------
 //  Ziggurat Method standard normal pseudorandom number generator code from 
 //  George Marsaglia and Wai Wan Tsang (2000).

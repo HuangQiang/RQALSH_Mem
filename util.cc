@@ -1,4 +1,17 @@
-#include "headers.h"
+#include <algorithm>
+#include <cassert>
+#include <cstring>
+
+#include <unistd.h>
+#include <stdarg.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/time.h>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+
 
 timeval g_start_time;
 timeval g_end_time;
@@ -55,7 +68,7 @@ int ResultCompDesc(					// compare function for qsort (descending)
 void create_dir(					// create directory
 	char *path)							// input path
 {
-	int len = (int)strlen(path);
+	int len = (int) strlen(path);
 	for (int i = 0; i < len; ++i) {
 		if (path[i] == '/') {
 			char ch = path[i + 1];

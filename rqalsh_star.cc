@@ -1,4 +1,10 @@
-#include "headers.h"
+#include <algorithm>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "rqalsh.h"
+#include "rqalsh_star.h"
 
 // -----------------------------------------------------------------------------
 RQALSH_STAR::RQALSH_STAR(			// constructor
@@ -48,7 +54,7 @@ void RQALSH_STAR::bulkload(			// bulkloading for each block
 	float **shift_data = new float*[n_pts_];
 	for (int i = 0; i < n_pts_; ++i) shift_data[i] = new float[dim_];
 	
-	vector<float> centroid(dim_, 0.0f);
+	std::vector<float> centroid(dim_, 0.0f);
 	for (int i = 0; i < n_pts_; ++i) {
 		for (int j = 0; j < dim_; ++j) {
 			centroid[j] += data[i][j];
@@ -103,7 +109,7 @@ int RQALSH_STAR::data_dependent_select( // drusilla select
 	// -------------------------------------------------------------------------
 	int   max_id   = -1;
 	float max_norm = -1.0f;
-	vector<float> norm(n_pts_, 0.0f);
+	std::vector<float> norm(n_pts_, 0.0f);
 
 	for (int i = 0; i < n_pts_; ++i) {
 		norm[i] = sqrt(calc_inner_product(dim_, shift_data[i], shift_data[i]));

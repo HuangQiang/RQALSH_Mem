@@ -1,4 +1,12 @@
-#include "headers.h"
+#include <algorithm>
+#include <cassert>
+#include <cstring>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "random.h"
+#include "rqalsh.h"
 
 // -----------------------------------------------------------------------------
 RQALSH::RQALSH(						// default constructor
@@ -539,7 +547,7 @@ float RQALSH::find_radius()			// find proper radius
 	//  find an array of projected distance which is closest to the query in
 	//  each of <m> hash tables 
 	// -------------------------------------------------------------------------
-	vector<float> list;
+	std::vector<float> list;
 	for (int i = 0; i < m_; ++i) {
 		if (lpos_[i] < rpos_[i]) {
 			list.push_back(fabs(tables_[i][lpos_[i]].key_ - q_val_[i]));
@@ -550,7 +558,7 @@ float RQALSH::find_radius()			// find proper radius
 	// -------------------------------------------------------------------------
 	//  sort the array in ascending order 
 	// -------------------------------------------------------------------------
-	sort(list.begin(), list.end());
+	std::sort(list.begin(), list.end());
 
 	// -------------------------------------------------------------------------
 	//  find the median distance and return the new radius

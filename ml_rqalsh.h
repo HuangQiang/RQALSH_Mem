@@ -1,9 +1,9 @@
 #ifndef __ML_RQALSH_H
 #define __ML_RQALSH_H
 
-class  RQALSH;
-class  MinK_List;
 struct Result;
+class  RQALSH;
+class  MaxK_List;
 
 // -----------------------------------------------------------------------------
 //  Blocks: an block which stores hash tables for some of data objects
@@ -12,7 +12,7 @@ struct Blocks {
 	int    n_pts_;					// number of data objects
 	float  radius_;					// radius of this block
 	RQALSH *lsh_;					// index of data objects in this blocks
-	vector<int> index_;				// data object id
+	std::vector<int> index_;		// data object id
 
 	Blocks() { n_pts_ = -1; radius_ = -1.0f; lsh_ = NULL; }
 	~Blocks() { if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; } }
@@ -50,7 +50,7 @@ protected:
 	int   num_blocks_;				// number of blocks
 	float *centroid_;				// centroid of data objects
 	float **shift_data_;			// shift data (move to centroid)
-	vector<Blocks*> blocks_;		// blocks
+	std::vector<Blocks*> blocks_;	// blocks
     
     // -------------------------------------------------------------------------
 	void bulkload();				// build hash tables

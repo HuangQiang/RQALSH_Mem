@@ -1,4 +1,9 @@
-#include "headers.h"
+#include <algorithm>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "qdafn.h"
 
 // -----------------------------------------------------------------------------
 //  Ziggurat Method standard normal pseudorandom number generator code from 
