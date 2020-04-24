@@ -1,103 +1,54 @@
 #include "rqalsh_star.h"
 
 // -----------------------------------------------------------------------------
-RQALSH_STAR::RQALSH_STAR()			// default constructor
-{
-	n_pts_ = -1;
-	dim_   = -1;
-	B_     = -1;
-	L_     = -1;
-	M_     = -1;
-	cand_  = NULL;
-	lsh_   = NULL;
-}
-
-// -----------------------------------------------------------------------------
-RQALSH_STAR::~RQALSH_STAR()			// destructor
-{
-	delete[] cand_; cand_ = NULL; 
-	g_memory -= SIZEINT * L_ * M_;
-	
-	if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; }
-}
-
-// -----------------------------------------------------------------------------
-int RQALSH_STAR::build(				// build index	
-	int   n,							// number of data objects
+RQALSH_STAR::RQALSH_STAR(			// constructor
+	int   n,							// cardinality
 	int   d,							// dimensionality
-	int   B,							// page size
-	int   L,							// number of projection
+	int   L,							// number of proj
 	int   M,							// number of candidates
-	int   beta,							// false positive percentage
-	float delta,						// error probability
 	float ratio,						// approximation ratio
-	const float **data,					// data objects
-	const char  *path)					// index path
+	const float **data)					// data objects
 {
 	// -------------------------------------------------------------------------
 	//  init parameters
 	// -------------------------------------------------------------------------
-	n_pts_      = n;
-	dim_        = d;
-	B_          = B;
-	L_          = L;
-	M_          = M;
-	strcpy(path_, path); strcat(path_, "indices/");
-	create_dir(path_);
+	n_pts_ = n;
+	dim_   = d;
+	L_     = L;
+	M_     = M;
+	data_  = data;
+	lsh_   = NULL;
 
 	// -------------------------------------------------------------------------
-	//  get representative data from data dependent selection
+	//  get sample data from data dependent selection
 	// -------------------------------------------------------------------------
 	int n_cand = L_ * M_;
 	g_memory += SIZEINT * n_cand;
 	cand_ = new int[n_cand];
-
 	data_dependent_select(data, cand_);
 
 	// -------------------------------------------------------------------------
-	//  build rqalsh for representative data if necessary
+	//  build rqalsh if necessary
 	// -------------------------------------------------------------------------
-	if (n_cand > CANDIDATES) {
-		float **cand_data = new float*[n_cand];
-		for (int i = 0; i < n_cand; ++i) {
-			cand_data[i] = new float[dim_];
+	if (n_cand > N_THRESHOLD) {
+		lsh_ = new RQALSH(n_cand, dim_, ratio);
 
+		int m = lsh_->m_;
+		for (int i = 0; i < n_cand; ++i) {
 			int id = cand_[i];
-			for (int j = 0; j < dim_; ++j) cand_data[i][j] = data[id][j];
+			for (int j = 0; j < m; ++j) {
+				lsh_->tables_[j][i].id_  = i;
+				lsh_->tables_[j][i].key_ = lsh_->calc_hash_value(j, data[id]);
+			}
 		}
-
-		lsh_ = new RQALSH();
-		lsh_->build(n_cand, dim_, B_, beta, delta, ratio, 
-			(const float **) cand_data, path_);
-
-		for (int i = 0; i < n_cand; ++i) {
-			delete[] cand_data[i]; cand_data[i] = NULL;
+		for (int i = 0; i < m; ++i) {
+			qsort(lsh_->tables_[i], n_cand, sizeof(Result), ResultComp);
 		}
-		delete[] cand_data; cand_data = NULL;
 	}
-
-	// -------------------------------------------------------------------------
-	//  write parameters to disk
-	// -------------------------------------------------------------------------
-	char fname[200];
-	strcpy(fname, path_); strcat(fname, "rqalsh_star_para");
-	
-	FILE *fp = fopen(fname, "wb");
-	if (!fp) { printf("Could not create %s\n", fname); return 1; }
-
-	fwrite(&n_pts_, SIZEINT, 1,      fp);
-	fwrite(&dim_,   SIZEINT, 1,      fp);
-	fwrite(&B_,     SIZEINT, 1,      fp);
-	fwrite(&L_,     SIZEINT, 1,      fp);
-	fwrite(&M_,     SIZEINT, 1,      fp);
-	fwrite(cand_,   SIZEINT, n_cand, fp);
-	fclose(fp);
-
-	return 0;
 }
 
 // -----------------------------------------------------------------------------
-void RQALSH_STAR::data_dependent_select( // data dependent selection
+void RQALSH_STAR::data_dependent_select(// data dependent selection
 	const float **data,					// data objects
 	int   *cand)						// candidate id (return)
 {
@@ -110,14 +61,13 @@ void RQALSH_STAR::data_dependent_select( // data dependent selection
 	float **shift_data = new float*[n_pts_];
 	for (int i = 0; i < n_pts_; ++i) shift_data[i] = new float[dim_];
 
-	calc_shift_data(data, max_id, max_norm, norm, shift_data);
+	calc_shift_data(max_id, max_norm, norm, shift_data);
 
 	// -------------------------------------------------------------------------
 	//  data dependent selection
 	// -------------------------------------------------------------------------
 	float  *proj  = new float[dim_];
 	Result *score = new Result[n_pts_];
-
 	for (int i = 0; i < L_; ++i) {
 		// ---------------------------------------------------------------------
 		//  select the projection vector with largest norm and normalize it
@@ -180,8 +130,7 @@ void RQALSH_STAR::data_dependent_select( // data dependent selection
 }
 
 // -----------------------------------------------------------------------------
-void RQALSH_STAR::calc_shift_data( 	// calculate shift data objects
-	const float **data,					// data objects
+void RQALSH_STAR::calc_shift_data(	// calculate shift data objects
 	int   &max_id,						// data id with max l2-norm (return)
 	float &max_norm,					// max l2-norm (return)
 	float *norm,						// l2-norm of shift data (return)
@@ -193,7 +142,7 @@ void RQALSH_STAR::calc_shift_data( 	// calculate shift data objects
 	std::vector<float> centroid(dim_, 0.0f);
 	for (int i = 0; i < n_pts_; ++i) {
 		for (int j = 0; j < dim_; ++j) {
-			centroid[j] += data[i][j];
+			centroid[j] += data_[i][j];
 		}
 	}
 	for (int i = 0; i < dim_; ++i) centroid[i] /= n_pts_;
@@ -207,7 +156,7 @@ void RQALSH_STAR::calc_shift_data( 	// calculate shift data objects
 	for (int i = 0; i < n_pts_; ++i) {
 		norm[i] = 0.0f;
 		for (int j = 0; j < dim_; ++j) {
-			float tmp = data[i][j] - centroid[j];
+			float tmp = data_[i][j] - centroid[j];
 			shift_data[i][j] = tmp;
 			norm[i] += SQR(tmp);
 		}
@@ -215,87 +164,55 @@ void RQALSH_STAR::calc_shift_data( 	// calculate shift data objects
 
 		if (norm[i] > max_norm) { max_norm = norm[i]; max_id = i; }
 	}
+	centroid.clear(); centroid.shrink_to_fit();
+}
+
+// -----------------------------------------------------------------------------
+RQALSH_STAR::~RQALSH_STAR()			// destructor
+{
+	delete[] cand_; cand_ = NULL; 
+	g_memory -= SIZEINT * L_ * M_;
+
+	if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; }
 }
 
 // -----------------------------------------------------------------------------
 void RQALSH_STAR::display()			// display parameters
 {
 	printf("Parameters of RQALSH*:\n");
-	printf("    n    = %d\n", n_pts_);
-	printf("    d    = %d\n", dim_);
-	printf("    B    = %d\n", B_);
-	printf("    L    = %d\n", L_);
-	printf("    M    = %d\n", M_);
-	printf("    path = %s\n", path_);
+	printf("    n    = %d\n",   n_pts_);
+	printf("    d    = %d\n",   dim_);
+	printf("    L    = %d\n",   L_);
+	printf("    M    = %d\n",   M_);
 	printf("\n");
 }
 
 // -----------------------------------------------------------------------------
-int RQALSH_STAR::load(				// restore parameters
-	const char *path)					// index path
-{
-	strcpy(path_, path); strcat(path_, "indices/");
-
-	// -------------------------------------------------------------------------
-	//  read parameters from disk
-	// -------------------------------------------------------------------------
-	char fname[200];
-	strcpy(fname, path_); strcat(fname, "rqalsh_star_para");
-
-	FILE* fp = fopen(fname, "rb");
-	if (!fp) { printf("Could not open %s\n", fname); return 1; }
-
-	fread(&n_pts_, SIZEINT, 1, fp);
-	fread(&dim_,   SIZEINT, 1, fp);
-	fread(&B_,     SIZEINT, 1, fp);
-	fread(&L_,     SIZEINT, 1, fp);
-	fread(&M_,     SIZEINT, 1, fp);
-	
-	int n_cand = L_ * M_;
-	g_memory += SIZEINT * n_cand;
-	cand_ = new int[n_cand];
-	fread(cand_, SIZEINT, n_cand, fp);
-	fclose(fp);
-
-	// -------------------------------------------------------------------------
-	//  load rqalsh if necessary
-	// -------------------------------------------------------------------------
-	if (n_cand > CANDIDATES) {
-		lsh_ = new RQALSH();
-		lsh_->load(path_);
-	}
-	return 0;
-}
-
-// -----------------------------------------------------------------------------
-uint64_t RQALSH_STAR::kfn(			// c-k-AFN search
-	int top_k,							// top-k value
+int RQALSH_STAR::kfn(				// c-k-AFN search
+	int   top_k,						// top-k value
 	const float *query,					// query object
-	const char *data_folder,			// data folder
 	MaxK_List *list)					// k-FN results (return)
 {
-	// -------------------------------------------------------------------------
-	//  use index to speed up c-k-AFN search
-	// -------------------------------------------------------------------------
 	int n_cand = L_ * M_;
-	int candidates = CANDIDATES + top_k - 1;
+	if (n_cand > N_THRESHOLD) {
+		// find candidates by rqalsh
+		std::vector<int> cand_list;
+		lsh_->kfn(top_k, MINREAL, query, cand_list);
 
-	if (n_cand > candidates) {
-		return lsh_->kfn(top_k, query, (const int*) cand_, data_folder, list);
+		// check candidates
+		for (size_t i = 0; i < cand_list.size(); ++i) {
+			int   id   = cand_[cand_list[i]];
+			float dist = calc_l2_dist(dim_, data_[id], query);
+			list->insert(dist, id + 1);
+		}
 	}
-
-	// -------------------------------------------------------------------------
-	//  otherwise, linear scan directly
-	// -------------------------------------------------------------------------
-	float *data = new float[dim_];		
-	for (int i = 0; i < n_cand; ++i) {
-		int id  = cand_[i];
-		read_data_new_format(id, dim_, B_, data_folder, data);
-
-		float dist = calc_l2_dist(dim_, (const float*) data, query);
-		list->insert(dist, id + 1);
+	else {
+		// check all candidates
+		for (int i = 0; i < n_cand; ++i) {
+			int   id   = cand_[i];
+			float dist = calc_l2_dist(dim_, data_[id], query);
+			list->insert(dist, id + 1);
+		}
 	}
-	delete[] data; data = NULL;
-	
-	return (uint64_t) n_cand;
+	return 0;
 }
