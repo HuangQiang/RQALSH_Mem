@@ -73,7 +73,7 @@ float MaxK_List::insert(			// insert item
 	}
 	list_[i].key_ = key;				// store new item here
 	list_[i].id_ = id;
-	if (num_ < k_) num_++;			// increase the number of items
+	if (num_ < k_) ++num_;			// increase the number of items
 
 	return min_key();
 }

@@ -2,15 +2,16 @@
 #define __PRI_QUEUE_H
 
 #include <iostream>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 
 #include "def.h"
 
 // -----------------------------------------------------------------------------
 //  basic data structures
 // -----------------------------------------------------------------------------
-struct Result {
+struct Result {						// basic data structure 
 	float key_;
 	int   id_;
 };

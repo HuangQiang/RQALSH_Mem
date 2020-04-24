@@ -19,7 +19,7 @@ inline float uniform(				// r.v. from Uniform(min, max)
 	// assert(x >= min && x <= max);
 	// return x;
 
-	return min + (max - min) * (float) rand() / (float) RAND_MAX;
+	return min + (max - min) * (float)rand() / (float)RAND_MAX;
 }
 
 // -----------------------------------------------------------------------------
