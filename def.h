@@ -41,5 +41,4 @@ const float PI            = 3.141592654F;
 const float FLOATZERO     = 1e-6F;
 const float ANGLE         = PI / 8.0f;
 
-
 #endif // __DEF_H

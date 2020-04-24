@@ -1,8 +1,3 @@
-#include <algorithm>
-
-#include "def.h"
-#include "util.h"
-#include "pri_queue.h"
 #include "qdafn.h"
 
 // -----------------------------------------------------------------------------
@@ -198,7 +193,7 @@ QDAFN::QDAFN(						// constructor
 	const float **data)			       	// data objects
 {
 	// -------------------------------------------------------------------------
-	//  init the input parameters
+	//  init parameters
 	// -------------------------------------------------------------------------
 	n_pts_      = n;
 	dim_        = d;
@@ -235,6 +230,7 @@ QDAFN::QDAFN(						// constructor
 	zigset(MAGIC + 17);
 
 	int size = L_ * dim_;
+	g_memory += SIZEFLOAT * size;
 	proj_ = new float[size]; 
 	for (int i = 0; i < size; ++i) {
 		proj_[i] = RNOR / sqrt((float) dim_);
@@ -247,18 +243,12 @@ QDAFN::QDAFN(						// constructor
 }
 
 // -----------------------------------------------------------------------------
-QDAFN::~QDAFN()						// destrcutor
-{
-	delete[] pdp_; pdp_ = NULL; 
-	delete[] proj_; proj_ = NULL;
-}
-
-// -----------------------------------------------------------------------------
 int QDAFN::bulkload()				// build index
 {
 	// -------------------------------------------------------------------------
 	//  project all the points
 	// -------------------------------------------------------------------------
+	g_memory += sizeof(PDIST_PAIR) * (L_ + 1) * n_pts_;
 	pdp_ = new PDIST_PAIR[(L_ + 1) * n_pts_];
 
 	for (int i = 0; i < L_; ++i) {
@@ -355,6 +345,16 @@ int QDAFN::bulkload()				// build index
 		qsort(pdp_, n_pts_, sizeof(PDIST_PAIR), PDISTComp);
 	}
 	return 0;
+}
+
+// -----------------------------------------------------------------------------
+QDAFN::~QDAFN()						// destrcutor
+{
+	delete[] pdp_;  pdp_  = NULL; 
+	g_memory -= sizeof(PDIST_PAIR) * (L_ + 1) * n_pts_;
+	
+	delete[] proj_; proj_ = NULL; 
+	g_memory -= SIZEFLOAT * L_ * dim_;
 }
 
 // -----------------------------------------------------------------------------

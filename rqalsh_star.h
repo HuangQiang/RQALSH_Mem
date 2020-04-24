@@ -1,6 +1,18 @@
 #ifndef __RQALSH_STAR_H
 #define __RQALSH_STAR_H
 
+#include <iostream>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <vector>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "rqalsh.h"
+
 class RQALSH;
 class MaxK_List;
 
@@ -34,20 +46,22 @@ protected:
 	int    dim_;					// dimensionality
 	int    L_;						// number of projections
 	int    M_;						// number of candidates for each proj
-	float  appr_ratio_;				// approximation ratio
+	const float **data_;			// data objects
 
-	int    n_cand_;					// number of candidates
-	int    *cand_id_;				// candidate data objects id
-	float  **cand_data_;			// candidate data objects
+	int    *cand_;					// candidate data objects id
 	RQALSH *lsh_;					// index of sample data objects
 
 	// -------------------------------------------------------------------------
-	void bulkload(					// bulkloading
-		const float **data);			// objects after moving to centroid
-
+	void data_dependent_select(		// data dependent selection
+		const float **data,				// data objects
+		int   *cand);					// candidate id (return)
+			
 	// -------------------------------------------------------------------------
-	int data_dependent_select(		// data dependent selection
-		const float **shift_data);		// shift data objects
+	void calc_shift_data(			// calculate shift data objects
+		int   &max_id,					// data id with max l2-norm (return)
+		float &max_norm,				// max l2-norm (return)
+		float *norm,					// l2-norm of shift data (return)
+		float **shift_data); 			// shift data (return)
 };
 
 #endif // __RQALSH_STAR_H

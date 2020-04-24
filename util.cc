@@ -1,68 +1,12 @@
-#include <algorithm>
-#include <cassert>
-#include <cstring>
-
-#include <unistd.h>
-#include <stdarg.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include "def.h"
 #include "util.h"
-#include "pri_queue.h"
-
 
 timeval g_start_time;
 timeval g_end_time;
 
-float g_runtime = -1.0f;
-float g_ratio   = -1.0f;
-float g_recall  = -1.0f;
-
-// -----------------------------------------------------------------------------
-int ResultComp(						// compare function for qsort (ascending)
-	const void *e1,						// 1st element
-	const void *e2)						// 2nd element
-{
-	int ret = 0;
-	Result *item1 = (Result*) e1;
-	Result *item2 = (Result*) e2;
-
-	if (item1->key_ < item2->key_) {
-		ret = -1;
-	} 
-	else if (item1->key_ > item2->key_) {
-		ret = 1;
-	} 
-	else {
-		if (item1->id_ < item2->id_) ret = -1;
-		else if (item1->id_ > item2->id_) ret = 1;
-	}
-	return ret;
-}
-
-// -----------------------------------------------------------------------------
-int ResultCompDesc(					// compare function for qsort (descending)
-	const void *e1,						// 1st element
-	const void *e2)						// 2nd element
-{
-	int ret = 0;
-	Result *item1 = (Result*) e1;
-	Result *item2 = (Result*) e2;
-
-	if (item1->key_ < item2->key_) {
-		ret = 1;
-	} 
-	else if (item1->key_ > item2->key_) {
-		ret = -1;
-	} 
-	else {
-		if (item1->id_ < item2->id_) ret = -1;
-		else if (item1->id_ > item2->id_) ret = 1;
-	}
-	return ret;
-}
+float    g_runtime = -1.0f;
+float    g_ratio   = -1.0f;
+float    g_recall  = -1.0f;
+uint64_t g_memory  = 0;
 
 // -------------------------------------------------------------------------
 void create_dir(					// create directory
@@ -85,11 +29,11 @@ void create_dir(					// create directory
 }
 
 // -----------------------------------------------------------------------------
-int read_data(						// read data/query set from disk
-	int   n,							// number of data/query objects
+int read_txt_data(					// read data (text) from disk
+	int   n,							// number of data objects
 	int   d,							// dimensionality
-	const char *fname,					// address of data/query set
-	float **data)						// data/query objects (return)
+	const char *fname,					// address of data
+	float **data)						// data (return)
 {
 	gettimeofday(&g_start_time, NULL);
 	FILE *fp = fopen(fname, "r");
@@ -109,6 +53,34 @@ int read_data(						// read data/query set from disk
 		++i;
 	}
 	assert(feof(fp) && i == n);
+	fclose(fp);
+
+	gettimeofday(&g_end_time, NULL);
+	float running_time = g_end_time.tv_sec - g_start_time.tv_sec + 
+		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
+	printf("Read Data: %f Seconds\n\n", running_time);
+
+	return 0;
+}
+
+// -----------------------------------------------------------------------------
+int read_bin_data(					// read data (binary) from disk
+	int   n,							// number of data points
+	int   d,							// dimensionality
+	const char *fname,					// address of data
+	float **data)						// data (return)
+{
+	gettimeofday(&g_start_time, NULL);
+	FILE *fp = fopen(fname, "rb");
+	if (!fp) {
+		printf("Could not open %s\n", fname);
+		return 1;
+	}
+
+	int i = 0;
+	while (!feof(fp) && i < n) {
+		fread(data[i++], SIZEFLOAT, d, fp);
+	}
 	fclose(fp);
 
 	gettimeofday(&g_end_time, NULL);

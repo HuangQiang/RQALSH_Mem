@@ -1,8 +1,3 @@
-#include <algorithm>
-
-#include "def.h"
-#include "util.h"
-#include "pri_queue.h"
 #include "drusilla_select.h"
 
 // -----------------------------------------------------------------------------
@@ -29,57 +24,27 @@ Drusilla_Select::Drusilla_Select(	// default constructor
 }
 
 // -----------------------------------------------------------------------------
-Drusilla_Select::~Drusilla_Select()
-{
-	delete[] cand_; cand_ = NULL;
-}
-
-// -----------------------------------------------------------------------------
 void Drusilla_Select::bulkload()		// build hash tables
 {
 	// -------------------------------------------------------------------------
-	//  calculate centroid
-	// -------------------------------------------------------------------------
-	std::vector<float> centroid(dim_, 0.0f);
-	for (int i = 0; i < n_pts_; ++i) {
-		for (int j = 0; j < dim_; ++j) {
-			centroid[j] += data_[i][j];
-		}
-	}
-	for (int i = 0; i < dim_; ++i) {
-		centroid[i] /= (float) n_pts_;
-	}
-
-	// -------------------------------------------------------------------------
 	//  calc the shift data
-	// -------------------------------------------------------------------------
-	float **shift_data = new float*[n_pts_];
-	for (int i = 0; i < n_pts_; ++i) {
-		shift_data[i] = new float[dim_];
-		for (int j = 0; j < dim_; ++j) {
-			shift_data[i][j] = data_[i][j] - centroid[j];
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	//  find the idect with maximum Euclidean norm
 	// -------------------------------------------------------------------------
 	int   max_id = -1;
 	float max_norm = -1.0f;
-	std::vector<float> norm(n_pts_, 0.0f);
+	float *norm = new float[n_pts_];
+	float **shift_data = new float*[n_pts_];
+	for (int i = 0; i < n_pts_; ++i) shift_data[i] = new float[dim_];
 
-	for (int i = 0; i < n_pts_; ++i) {
-		norm[i] = sqrt(calc_inner_product(dim_, shift_data[i], shift_data[i]));
-		if (norm[i] > max_norm) {
-			max_norm = norm[i];
-			max_id = i;
-		}
-	}
+	calc_shift_data(max_id, max_norm, norm, shift_data);
 
-	std::vector<bool> close_angle(n_pts_, false);
-	Result *score = new Result[n_pts_];
+	// -------------------------------------------------------------------------
+	//  drusilla-select
+	// -------------------------------------------------------------------------
 	float  *proj  = new float[dim_];
+	Result *score = new Result[n_pts_];
+	bool   *close_angle = new bool[n_pts_];
 
+	g_memory += SIZEINT * l_ * m_;
 	cand_ = new int[l_ * m_];
 	for (int i = 0; i < l_; ++i) {
 		// ---------------------------------------------------------------------
@@ -99,7 +64,7 @@ void Drusilla_Select::bulkload()		// build hash tables
 			if (norm[j] > 0.0f) {
 				float offset = calc_inner_product(dim_, shift_data[j], proj);
 
-				float distortion = 0.0F;
+				float distortion = 0.0f;
 				for (int k = 0; k < dim_; ++k) {
 					distortion += SQR(shift_data[j][k] - offset * proj[k]);
 				}
@@ -119,7 +84,7 @@ void Drusilla_Select::bulkload()		// build hash tables
 		}
 
 		// ---------------------------------------------------------------------
-		//  collect the idects that are well-represented by this proj
+		//  collect the objects that are well-represented by this proj
 		// ---------------------------------------------------------------------
 		qsort(score, n_pts_, sizeof(Result), ResultCompDesc);
 		for (int j = 0; j < m_; ++j) {
@@ -135,20 +100,17 @@ void Drusilla_Select::bulkload()		// build hash tables
 		max_id = -1;
 		max_norm = -1.0f;
 		for (int j = 0; j < n_pts_; ++j) {
-			if (norm[j] > 0.0f && close_angle[j]) {
-				norm[j] = 0.0f;
-			}
-			if (norm[j] > max_norm) {
-				max_norm = norm[j];
-				max_id = j;
-			}
+			if (norm[j] > 0.0f && close_angle[j]) { norm[j] = 0.0f; }
+			if (norm[j] > max_norm) { max_norm = norm[j]; max_id = j; }
 		}
 	}
 	// -------------------------------------------------------------------------
 	//  release space
 	// -------------------------------------------------------------------------
-	delete[] proj;  proj  = NULL;
-	delete[] score; score = NULL;
+	delete[] norm;        norm        = NULL;
+	delete[] close_angle; close_angle = NULL;
+	delete[] proj;        proj        = NULL;
+	delete[] score;       score       = NULL;
 
 	for (int i = 0; i < n_pts_; ++i) {
 		delete[] shift_data[i]; shift_data[i] = NULL;
@@ -157,13 +119,59 @@ void Drusilla_Select::bulkload()		// build hash tables
 }
 
 // -----------------------------------------------------------------------------
+void Drusilla_Select::calc_shift_data( // calculate shift data objects
+	int   &max_id,						// data id with max l2-norm (return)
+	float &max_norm,					// max l2-norm (return)
+	float *norm,						// l2-norm of shift data (return)
+	float **shift_data) 				// shift data (return)
+{
+	// -------------------------------------------------------------------------
+	//  calculate the centroid of data objects
+	// -------------------------------------------------------------------------
+	float *centroid = new float[dim_];
+	memset(centroid, 0.0f, dim_ * SIZEFLOAT);
+	for (int i = 0; i < n_pts_; ++i) {
+		for (int j = 0; j < dim_; ++j) {
+			centroid[j] += data_[i][j];
+		}
+	}
+	for (int i = 0; i < dim_; ++i) centroid[i] /= n_pts_;
+
+	// -------------------------------------------------------------------------
+	//  calc shift data and their l2-norm and find max l2-norm and its id
+	// -------------------------------------------------------------------------
+	max_id   = -1;
+	max_norm = MINREAL;
+
+	for (int i = 0; i < n_pts_; ++i) {
+		norm[i] = 0.0f;
+		for (int j = 0; j < dim_; ++j) {
+			float tmp = data_[i][j] - centroid[j];
+			shift_data[i][j] = tmp;
+			norm[i] += SQR(tmp);
+		}
+		norm[i] = sqrt(norm[i]);
+
+		if (norm[i] > max_norm) { max_norm = norm[i]; max_id = i; }
+	}
+	delete[] centroid; centroid = NULL;
+}
+
+// -----------------------------------------------------------------------------
+Drusilla_Select::~Drusilla_Select()
+{
+	delete[] cand_; cand_ = NULL; g_memory -= SIZEINT * l_ * m_;
+}
+
+// -----------------------------------------------------------------------------
 void Drusilla_Select::display()		// display the parameters
 {
 	printf("Parameters of Drusilla-Select (SISAP2016 paper):\n");
-	printf("    n     = %d\n",   n_pts_);
-	printf("    d     = %d\n",   dim_);
-	printf("    l     = %d\n",   l_);
-	printf("    m     = %d\n\n", m_);
+	printf("    n     = %d\n", n_pts_);
+	printf("    d     = %d\n", dim_);
+	printf("    l     = %d\n", l_);
+	printf("    m     = %d\n", m_);
+	printf("\n");
 }
 
 // -----------------------------------------------------------------------------

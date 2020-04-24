@@ -1,17 +1,4 @@
-#include <algorithm>
-#include <cstring>
-#include <sys/time.h>
-
-#include "def.h"
-#include "util.h"
-#include "pri_queue.h"
-#include "qdafn.h"
-#include "drusilla_select.h"
-#include "rqalsh.h"
-#include "rqalsh_star.h"
-#include "ml_rqalsh.h"
 #include "afn.h"
-
 
 // -----------------------------------------------------------------------------
 int linear_scan(					// k-FN search of linear scan
@@ -112,8 +99,11 @@ int ml_rqalsh(						// c-k-AFN search of ML-RQALSH
 	gettimeofday(&g_end_time, NULL);
 	float indexing_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Indexing Time: %f seconds\n\n", indexing_time);
-	fprintf(fp, "Indexing Time = %f Seconds\n\n", indexing_time);
+	printf("Indexing Time = %f Seconds\n", indexing_time);
+	printf("Memory = %f MB\n\n", g_memory / 1048576.0f);
+	
+	fprintf(fp, "index_time = %f Seconds\n", indexing_time);
+	fprintf(fp, "memory     = %f MB\n\n", g_memory / 1048576.0f);
 
 	// -------------------------------------------------------------------------
 	//  c-k-AFN search
@@ -161,6 +151,7 @@ int ml_rqalsh(						// c-k-AFN search of ML-RQALSH
 	//  release space
 	// -------------------------------------------------------------------------
 	delete lsh; lsh = NULL;
+	assert(g_memory == 0);
 
 	return 0;
 }
@@ -197,9 +188,13 @@ int rqalsh_star(					// c-k-AFN search of RQALSH*
 	gettimeofday(&g_end_time, NULL);
 	float indexing_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Indexing Time: %f seconds\n\n", indexing_time);
-	fprintf(fp, "L = %d, M = %d\n", L, M);
-	fprintf(fp, "Indexing Time = %f Seconds\n\n", indexing_time);
+	printf("Indexing Time = %f Seconds\n", indexing_time);
+	printf("Memory = %f MB\n\n", g_memory / 1048576.0f);
+	
+	fprintf(fp, "L          = %d\n", L);
+	fprintf(fp, "M          = %d\n", M);
+	fprintf(fp, "index_time = %f Seconds\n", indexing_time);
+	fprintf(fp, "memory     = %f MB\n\n", g_memory / 1048576.0f);
 
 	// -------------------------------------------------------------------------
 	//  c-k-AFN search
@@ -247,6 +242,7 @@ int rqalsh_star(					// c-k-AFN search of RQALSH*
 	//  release space
 	// -------------------------------------------------------------------------
 	delete lsh; lsh = NULL;
+	assert(g_memory == 0);
 
 	return 0;
 }
@@ -281,8 +277,11 @@ int rqalsh(							// c-k-AFN search of RQALSH
 	gettimeofday(&g_end_time, NULL);
 	float indexing_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Indexing Time: %f seconds\n\n", indexing_time);
-	fprintf(fp, "Indexing Time = %f Seconds\n\n", indexing_time);
+	printf("Indexing Time = %f Seconds\n", indexing_time);
+	printf("Memory = %f MB\n\n", g_memory / 1048576.0f);
+	
+	fprintf(fp, "index_time = %f Seconds\n", indexing_time);
+	fprintf(fp, "memory     = %f MB\n\n", g_memory / 1048576.0f);
 
 	// -------------------------------------------------------------------------
 	//  c-k-AFN search
@@ -330,6 +329,7 @@ int rqalsh(							// c-k-AFN search of RQALSH
 	//  release space
 	// -------------------------------------------------------------------------
 	delete lsh; lsh = NULL;
+	assert(g_memory == 0);
 
 	return 0;
 }
@@ -365,9 +365,13 @@ int drusilla_select(				// c-k-AFN search of Drusilla-Select
 	gettimeofday(&g_end_time, NULL);
 	float indexing_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Indexing Time: %f seconds\n\n", indexing_time);
-	fprintf(fp, "L = %d, M = %d\n", L, M);
-	fprintf(fp, "Indexing Time = %f Seconds\n\n", indexing_time);
+	printf("Indexing Time = %f Seconds\n", indexing_time);
+	printf("Memory = %f MB\n\n", g_memory / 1048576.0f);
+	
+	fprintf(fp, "L          = %d\n", L);
+	fprintf(fp, "M          = %d\n", M);
+	fprintf(fp, "index_time = %f Seconds\n", indexing_time);
+	fprintf(fp, "memory     = %f MB\n\n", g_memory / 1048576.0f);
 
 	// -------------------------------------------------------------------------
 	//  c-k-AFN search of Drusilla-Select
@@ -415,6 +419,7 @@ int drusilla_select(				// c-k-AFN search of Drusilla-Select
 	//  release space
 	// -------------------------------------------------------------------------
 	delete drusilla; drusilla = NULL;
+	assert(g_memory == 0);
 
 	return 0;
 }
@@ -451,9 +456,13 @@ int qdafn(							// c-k-AFN search of QDAFN
 	gettimeofday(&g_end_time, NULL);
 	float indexing_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Indexing Time: %f seconds\n\n", indexing_time);
-	fprintf(fp, "L = %d, M = %d\n", L, M);
-	fprintf(fp, "Indexing Time = %f Seconds\n\n", indexing_time);
+	printf("Indexing Time = %f Seconds\n", indexing_time);
+	printf("Memory = %f MB\n\n", g_memory / 1048576.0f);
+	
+	fprintf(fp, "L          = %d\n", L);
+	fprintf(fp, "M          = %d\n", M);
+	fprintf(fp, "index_time = %f Seconds\n", indexing_time);
+	fprintf(fp, "memory     = %f MB\n\n", g_memory / 1048576.0f);
 
 	// -------------------------------------------------------------------------
 	//  c-k-AFN search of QDAFN
@@ -501,6 +510,7 @@ int qdafn(							// c-k-AFN search of QDAFN
 	//  release space
 	// -------------------------------------------------------------------------
 	delete hash; hash = NULL;
+	assert(g_memory == 0);
 
 	return 0;
 }

@@ -1,6 +1,23 @@
 #ifndef __AFN_H
 #define __AFN_H
 
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <sys/time.h>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "qdafn.h"
+#include "drusilla_select.h"
+#include "rqalsh.h"
+#include "rqalsh_star.h"
+#include "ml_rqalsh.h"
+
+struct Result;
+
 // -----------------------------------------------------------------------------
 int linear_scan(					// k-FN search of linear scan
 	int   n,							// number of data objects

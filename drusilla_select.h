@@ -1,6 +1,15 @@
 #ifndef __DRUSILLA_SELECT_H
 #define __DRUSILLA_SELECT_H
 
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+
 class MaxK_List;
 
 // -----------------------------------------------------------------------------
@@ -36,6 +45,13 @@ protected:
 
 	// -------------------------------------------------------------------------
 	void bulkload();				// build hash tables
+
+	// -------------------------------------------------------------------------
+	void calc_shift_data(			// calculate shift data objects
+		int   &max_id,					// data id with max l2-norm (return)
+		float &max_norm,				// max l2-norm (return)
+		float *norm,					// l2-norm of shift data (return)
+		float **shift_data); 			// shift data (return)
 };
 
 #endif // __DRUSILLA_SELECT_H

@@ -1,21 +1,33 @@
 #ifndef __ML_RQALSH_H
 #define __ML_RQALSH_H
 
+#include <iostream>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <vector>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+#include "rqalsh.h"
+
 struct Result;
 class  RQALSH;
 class  MaxK_List;
 
 // -----------------------------------------------------------------------------
-//  Blocks: an block which stores hash tables for some of data objects
+//  Block: an block which stores hash tables for some of data objects
 // -----------------------------------------------------------------------------
-struct Blocks {
+struct Block {
 	int    n_pts_;					// number of data objects
 	float  radius_;					// radius of this block
-	RQALSH *lsh_;					// index of data objects in this blocks
-	std::vector<int> index_;		// data object id
-
-	Blocks() { n_pts_ = -1; radius_ = -1.0f; lsh_ = NULL; }
-	~Blocks() { if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; } }
+	int    *index_;					// data object id
+	RQALSH *lsh_;					// rqalsh
+	
+	Block() { n_pts_ = -1; radius_ = -1.0f; index_ = NULL; lsh_ = NULL; }
+	~Block() { if (lsh_ != NULL) { delete lsh_; lsh_ = NULL; } }
 };
 
 // -----------------------------------------------------------------------------
@@ -44,16 +56,13 @@ public:
 protected:
 	int   n_pts_;					// number of data objects
 	int   dim_;						// dimensionality
-	float appr_ratio_;				// approximation ratio
-	const float **data_;					// data objects (modified)
+	float ratio_;					// approximation ratio
+	const float **data_;			// data objects
 
 	int   num_blocks_;				// number of blocks
+	int   *new_order_id_;			// new order data id after ml-partition
 	float *centroid_;				// centroid of data objects
-	float **shift_data_;			// shift data (move to centroid)
-	std::vector<Blocks*> blocks_;	// blocks
-    
-    // -------------------------------------------------------------------------
-	void bulkload();				// build hash tables
+	std::vector<Block*> blocks_;	// blocks
 };
 
 #endif // __ML_RQALSH_H

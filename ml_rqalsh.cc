@@ -1,12 +1,4 @@
-#include <algorithm>
-#include <cassert>
-
-#include "def.h"
-#include "util.h"
-#include "pri_queue.h"
-#include "rqalsh.h"
 #include "ml_rqalsh.h"
-
 
 // -----------------------------------------------------------------------------
 ML_RQALSH::ML_RQALSH(				// constructor
@@ -18,40 +10,15 @@ ML_RQALSH::ML_RQALSH(				// constructor
 	// -------------------------------------------------------------------------
 	//  init parameters
 	// -------------------------------------------------------------------------
-	n_pts_       = n;
-	dim_         = d;
-	appr_ratio_  = ratio;
-	data_        = data;
+	n_pts_  = n;
+	dim_    = d;
+	ratio_  = ratio;
+	data_   = data;
 
-	// -------------------------------------------------------------------------
-	//  build hash tables (bulkloading)
-	// -------------------------------------------------------------------------
-	bulkload();
-}
-
-// -----------------------------------------------------------------------------
-ML_RQALSH::~ML_RQALSH()				// destructor
-{
-	if (!blocks_.empty()) {
-		for (int i = 0; i < num_blocks_; ++i) {
-			delete blocks_[i]; blocks_[i] = NULL;
-		}
-		blocks_.clear(); blocks_.shrink_to_fit();
-	}
-
-	delete[] centroid_; centroid_ = NULL;
-	for (int i = 0; i < n_pts_; ++i) {
-		delete[] shift_data_[i]; shift_data_[i] = NULL;
-	}
-	delete[] shift_data_; shift_data_ = NULL;
-}
-
-// -----------------------------------------------------------------------------
-void ML_RQALSH::bulkload()			// build hash tables
-{
 	// -------------------------------------------------------------------------
 	//  calculate the centroid of data obejcts
 	// -------------------------------------------------------------------------
+	g_memory += SIZEFLOAT * dim_;
 	centroid_ = new float[dim_];
 	for (int i = 0; i < dim_; ++i) centroid_[i] = 0.0f;
 
@@ -60,69 +27,66 @@ void ML_RQALSH::bulkload()			// build hash tables
 			centroid_[j] += data_[i][j];
 		}
 	}
-	for (int i = 0; i < dim_; ++i) centroid_[i] /= (float) n_pts_;
+	for (int i = 0; i < dim_; ++i) centroid_[i] /= n_pts_;
 
 	// -------------------------------------------------------------------------
-	//  calculate the l2-dist after moving all data objects to their centroid
+	//  reorder data objects by their l2-dist to centroid (descending order)
 	// -------------------------------------------------------------------------
 	Result *arr = new Result[n_pts_];
 	for (int i = 0; i < n_pts_; ++i) {
 		arr[i].id_ = i;
 		arr[i].key_ = calc_l2_dist(dim_, data_[i], centroid_);
 	}
-
-	// -------------------------------------------------------------------------
-	//  reorder the shifted data objects by their l2-dist (descending order)
-	// -------------------------------------------------------------------------
 	qsort(arr, n_pts_, sizeof(Result), ResultCompDesc);
 
-	shift_data_ = new float*[n_pts_];
-	for (int i = 0; i < n_pts_; ++i) {
-		int id = arr[i].id_;
-
-		shift_data_[i] = new float[dim_];
-		for (int j = 0; j < dim_; ++j) {
-			shift_data_[i][j] = data_[id][j] - centroid_[j];
-		}
-	}
+	g_memory += SIZEINT * n_pts_;
+	new_order_id_ = new int[n_pts_];
+	for (int i = 0; i < n_pts_; ++i) new_order_id_[i] = arr[i].id_;
 
 	// -------------------------------------------------------------------------
-	//  divide datasets into blocks and build hash tables for each block
+	//  multi-level partition
 	// -------------------------------------------------------------------------
 	int start = 0;	
 	while (start < n_pts_) {
 		// ---------------------------------------------------------------------
-		//  divide one block
+		//  get new_order_id for one block
 		// ---------------------------------------------------------------------
-		Blocks *block = new Blocks();
+		int   idx = start, cnt = 0;
+		float radius = arr[start].key_;
+		float min_r  = LAMBDA * radius;
 
-		int   idx       = start;
-		int   count     = 0;
-		float radius    = arr[start].key_;
-		float threshold = LAMBDA * radius;
-
-		while (idx<n_pts_ && arr[idx].key_>threshold && count<MAX_BLOCK_NUM) {
-			block->index_.push_back(arr[idx].id_);
-			++count;
+		while (idx < n_pts_ && arr[idx].key_> min_r) {
 			++idx;
+			if (++cnt >= MAX_BLOCK_NUM) break; 
 		}
 
 		// ---------------------------------------------------------------------
-		//  update info
+		//  init each block (and build rqalsh for it)
 		// ---------------------------------------------------------------------
-		block->n_pts_  = count;
+		Block *block = new Block();
+		block->n_pts_  = cnt;
 		block->radius_ = radius;
+		block->index_  = new_order_id_ + start;
 
-		if (count > N_THRESHOLD) {
-			block->lsh_ = new RQALSH(count, dim_, appr_ratio_, 
-				(const float **) shift_data_ + start);
+		if (cnt > N_THRESHOLD) {
+			block->lsh_ = new RQALSH(cnt, dim_, ratio_);
+
+			int m = block->lsh_->m_;
+			for (int i = 0; i < cnt; ++i) {
+				int id = block->index_[i];
+				for (int j = 0; j < m; ++j) {
+					float val = block->lsh_->calc_hash_value(j, data[id]);
+					block->lsh_->tables_[j][i].id_  = i;
+					block->lsh_->tables_[j][i].key_ = val;
+				}
+			}
+			for (int i = 0; i < m; ++i) {
+				qsort(block->lsh_->tables_[i], cnt, sizeof(Result), ResultComp);
+			}
 		}
 		blocks_.push_back(block);
-		start += count;
+		start += cnt;
 	}
-	// -------------------------------------------------------------------------
-	//  get the number of blocks
-	// -------------------------------------------------------------------------
 	num_blocks_ = (int) blocks_.size();
 	assert(start == n_pts_);
 
@@ -133,13 +97,28 @@ void ML_RQALSH::bulkload()			// build hash tables
 }
 
 // -----------------------------------------------------------------------------
+ML_RQALSH::~ML_RQALSH()				// destructor
+{
+	delete[] new_order_id_; new_order_id_ = NULL; g_memory -= SIZEINT * n_pts_;
+	delete[] centroid_; centroid_ = NULL; g_memory -= SIZEFLOAT * dim_;
+
+	if (!blocks_.empty()) {
+		for (int i = 0; i < num_blocks_; ++i) {
+			delete blocks_[i]; blocks_[i] = NULL;
+		}
+		blocks_.clear(); blocks_.shrink_to_fit();
+	}
+}
+
+// -----------------------------------------------------------------------------
 void ML_RQALSH::display()			// display parameters
 {
 	printf("Parameters of ML_RQALSH:\n");
 	printf("    n          = %d\n",   n_pts_);
 	printf("    d          = %d\n",   dim_);
-	printf("    c          = %.1f\n", appr_ratio_);
-	printf("    num_blocks = %d\n\n", num_blocks_);
+	printf("    c          = %.1f\n", ratio_);
+	printf("    num_blocks = %d\n",   num_blocks_);
+	printf("\n");
 }
 
 // -----------------------------------------------------------------------------
@@ -148,58 +127,44 @@ int ML_RQALSH::kfn(					// c-k-AFN search
 	const float *query,					// input query
 	MaxK_List *list)					// top-k results (return)
 {
-	// -------------------------------------------------------------------------
-	//  calculate the Euclidean arr of query
-	// -------------------------------------------------------------------------
-	float dist2ctr_q = 0.0f;		// l2-dist to centroid for query
-	float *ctr_q = new float[dim_];	// centroid to query
-	for (int i = 0; i < dim_; ++i) {
-		ctr_q[i] = query[i] - centroid_[i];
-		dist2ctr_q += ctr_q[i] * ctr_q[i];
-	}
-	dist2ctr_q = sqrt(dist2ctr_q);
-
-	// -------------------------------------------------------------------------
-	//  c-k-AFN search
-	// -------------------------------------------------------------------------
-	int candidates = CANDIDATES + top_k - 1;
+	float dist2ctr = calc_l2_dist(dim_, centroid_, query);
 	float radius = MINREAL;
+	std::vector<int> cand;
 
 	for (int i = 0; i < num_blocks_; ++i) {
+		Block *block = blocks_[i];
+
 		// ---------------------------------------------------------------------
 		//  pruning
 		// ---------------------------------------------------------------------
-		float ub = blocks_[i]->radius_ + dist2ctr_q;
-		if (radius > ub / appr_ratio_) break;
+		float ub = block->radius_ + dist2ctr;
+		if (radius > ub / ratio_) break;
 
 		// ---------------------------------------------------------------------
 		//  c-k-AFN search on each block
 		// ---------------------------------------------------------------------
-		int n = blocks_[i]->n_pts_;
+		int n = block->n_pts_;
 		if (n > N_THRESHOLD) {
-			// -----------------------------------------------------------------
-			//  larger than <candidates>, use RQALSH for c-k-AFN search
-			// -----------------------------------------------------------------	
-			blocks_[i]->lsh_->kfn(top_k, radius, (const float *) ctr_q, 
-				blocks_[i]->index_.data(), list);
+			// find candidates by rqalsh
+			cand.clear();
+			block->lsh_->kfn(top_k, radius, query, cand);
+
+			// check candidates
+			for (size_t j = 0; j < cand.size(); ++j) {
+				int   id   = block->index_[cand[j]];
+				float dist = calc_l2_dist(dim_, data_[id], query);
+				list->insert(dist, id + 1);
+			}	
 		}
 		else {
-			// -----------------------------------------------------------------
-			//  otherwise, use linear scan for c-k-AFN search
-			// -----------------------------------------------------------------
+			// check all candidates
 			for (int j = 0; j < n; ++j) {
-				int   id   = blocks_[i]->index_[j];
-				float dist = calc_l2_dist(dim_, query, data_[id]);
+				int   id   = block->index_[j];
+				float dist = calc_l2_dist(dim_, data_[id], query);
 				list->insert(dist, id + 1);
 			}
 		}
 		radius = list->min_key();
 	}
-
-	// -------------------------------------------------------------------------
-	//  release space
-	// -------------------------------------------------------------------------
-	delete[] ctr_q; ctr_q = NULL;
-
 	return 0;
 }

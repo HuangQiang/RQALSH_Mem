@@ -1,6 +1,15 @@
 #ifndef __QDAFN_H
 #define __QDAFN_H
 
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+#include "def.h"
+#include "util.h"
+#include "pri_queue.h"
+
 class MaxK_List;
 
 // -----------------------------------------------------------------------------
