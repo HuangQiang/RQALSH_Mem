@@ -335,7 +335,7 @@ int RQALSH::kfn(					// k-FN search (for ML_RQALSH)
 						ldist = fabs(q_v - table[lpos].key_);
 					}
 					else break;
-					if (ldist < width) break;
+					if (ldist < width || ldist < range) break;
 
 					int id = table[lpos].id_;
 					if (++freq[id] >= l_ && !checked[id]) {
@@ -359,7 +359,7 @@ int RQALSH::kfn(					// k-FN search (for ML_RQALSH)
 						rdist = fabs(q_v - table[rpos].key_);
 					}
 					else break;
-					if (rdist < width) break;
+					if (rdist < width || rdist < range) break;
 
 					int id = table[rpos].id_;
 					if (++freq[id] >= l_ && !checked[id]) {
