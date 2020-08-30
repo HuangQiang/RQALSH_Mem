@@ -1,5 +1,4 @@
-#ifndef __QDAFN_H
-#define __QDAFN_H
+#pragma once
 
 #include <iostream>
 #include <algorithm>
@@ -81,7 +80,7 @@ public:
         int   M,						// number of candidates
         int   algo,						// which algorithm
         float ratio,					// approximation ratio
-        const float **data);	       	// data objects
+        const float *data);				// data objects
     
     // -------------------------------------------------------------------------
     ~QDAFN();                       // destructor
@@ -95,14 +94,24 @@ public:
 	    const float *query,				// input query
 	    MaxK_List *list);				// c-k-AFN results (return)
 
+	// -------------------------------------------------------------------------
+	int64_t get_memory_usage()		// get memory usage
+	{
+		int64_t ret = 0;
+		ret += sizeof(*this);
+		ret += SIZEFLOAT * L_ * dim_; // proj_
+		ret += sizeof(PDIST_PAIR) * (L_ + 1) * n_pts_; // pdp_
+		return ret;
+	}
+
 protected:
 	int   n_pts_;					// cardinality
 	int   dim_;				        // dimensionality
     int   L_;			            // number of random projections
 	int   M_;				        // number of candidates
 	int   algo_;	    	    	// which algorithm
-    float appr_ratio_;              // approximation ratio
-    const float **data_;			// data objects
+    float ratio_;					// approximation ratio
+    const float *data_;				// data objects
 
     float *proj_;			        // projection vectors
 	PDIST_PAIR *pdp_;				// projected info after random projection
@@ -110,5 +119,3 @@ protected:
 	// -------------------------------------------------------------------------
     int bulkload();                 // build index    
 };
-
-#endif // __QDAFN_H

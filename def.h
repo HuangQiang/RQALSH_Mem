@@ -1,5 +1,4 @@
-#ifndef __DEF_H
-#define __DEF_H
+#pragma once
 
 // -----------------------------------------------------------------------------
 //  Macros
@@ -38,7 +37,5 @@ const float MINREAL       = -MAXREAL;
 
 const float E             = 2.7182818F;
 const float PI            = 3.141592654F;
-const float FLOATZERO     = 1e-6F;
+const float CHECK_ERROR   = 0.000001F;
 const float ANGLE         = PI / 8.0f;
-
-#endif // __DEF_H

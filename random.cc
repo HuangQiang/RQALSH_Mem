@@ -13,7 +13,7 @@ float gaussian(						// r.v. from N(mean, sigma)
 	float u2 = -1.0f;
 	do {
 		u1 = uniform(0.0f, 1.0f);
-	} while (u1 < FLOATZERO);
+	} while (u1 < CHECK_ERROR);
 	u2 = uniform(0.0f, 1.0f);
 
 	return mu + sigma * sqrt(-2.0f * log(u1)) * cos(2.0f * PI * u2);

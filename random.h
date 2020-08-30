@@ -1,5 +1,4 @@
-#ifndef __RANDOM_H
-#define __RANDOM_H
+#pragma once
 
 #include <iostream>
 #include <algorithm>
@@ -72,5 +71,3 @@ void diff_prob_of_gaussian();		// curve of p1 - p2 vs. w under gaussian
 //  rho = log(1/p1) / log(1/p2) vs. w for a fixed ratio c
 // -----------------------------------------------------------------------------
 void rho_of_gaussian();				// curve of rho vs. w under gaussian
-
-#endif // __RANDOM_H

@@ -1,14 +1,17 @@
 #include "util.h"
 
-timeval g_start_time;
-timeval g_end_time;
+timeval g_start_time;				// global param: start time
+timeval g_end_time;					// global param: end time
 
-float    g_runtime = -1.0f;
-float    g_ratio   = -1.0f;
-float    g_recall  = -1.0f;
-uint64_t g_memory  = 0;
+float g_memory    = -1.0f;			// global param: estimated memory usage (MB)
+float g_indextime = -1.0f;			// global param: indexing time (seconds)
 
-// -------------------------------------------------------------------------
+float g_runtime   = -1.0f;			// global param: running time (ms)
+float g_ratio     = -1.0f;			// global param: overall ratio
+float g_recall    = -1.0f;			// global param: recall (%)
+float g_fraction  = -1.0f;			// global param: fraction (%)
+
+// -----------------------------------------------------------------------------
 void create_dir(					// create directory
 	char *path)							// input path
 {
@@ -17,11 +20,14 @@ void create_dir(					// create directory
 		if (path[i] == '/') {
 			char ch = path[i + 1];
 			path[i + 1] = '\0';
-									// check whether the directory exists
+
 			int ret = access(path, F_OK);
-			if (ret != 0) {			// create the directory
+			if (ret != 0) {			// create directory if not exists
 				ret = mkdir(path, 0755);
-				if (ret != 0) printf("Could not create directory %s\n", path);
+				if (ret != 0) {
+					printf("Could not create directory %s\n", path);
+					exit(1);
+				}
 			}
 			path[i + 1] = ch;
 		}
@@ -29,65 +35,27 @@ void create_dir(					// create directory
 }
 
 // -----------------------------------------------------------------------------
-int read_txt_data(					// read data (text) from disk
-	int   n,							// number of data objects
-	int   d,							// dimensionality
-	const char *fname,					// address of data
-	float **data)						// data (return)
-{
-	gettimeofday(&g_start_time, NULL);
-	FILE *fp = fopen(fname, "r");
-	if (!fp) {
-		printf("Could not open %s.\n", fname);
-		return 1;
-	}
-
-	int i = 0;
-	int j = 0;
-	while (!feof(fp) && i < n) {
-		fscanf(fp, "%d", &j);
-		for (j = 0; j < d; ++j) {
-			fscanf(fp, " %f", &data[i][j]);
-		}
-		fscanf(fp, "\n");
-		++i;
-	}
-	assert(feof(fp) && i == n);
-	fclose(fp);
-
-	gettimeofday(&g_end_time, NULL);
-	float running_time = g_end_time.tv_sec - g_start_time.tv_sec + 
-		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Read Data: %f Seconds\n\n", running_time);
-
-	return 0;
-}
-
-// -----------------------------------------------------------------------------
 int read_bin_data(					// read data (binary) from disk
 	int   n,							// number of data points
 	int   d,							// dimensionality
+	bool  is_data,						// is dataset?
 	const char *fname,					// address of data
-	float **data)						// data (return)
+	float *data)						// data (return)
 {
 	gettimeofday(&g_start_time, NULL);
 	FILE *fp = fopen(fname, "rb");
-	if (!fp) {
-		printf("Could not open %s\n", fname);
-		return 1;
-	}
+	if (!fp) { printf("Could not open %s\n", fname); return 1; }
 
-	int i = 0;
-	while (!feof(fp) && i < n) {
-		fread(data[i++], SIZEFLOAT, d, fp);
-	}
+	fread(data, SIZEFLOAT, n * d, fp);
 	fclose(fp);
 
 	gettimeofday(&g_end_time, NULL);
 	float running_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Read Data: %f Seconds\n\n", running_time);
-
+	
+	if (is_data) printf("Read Data:  %f Seconds\n", running_time);
+	else printf("Read Query: %f Seconds\n", running_time);
+	
 	return 0;
 }
 
@@ -95,7 +63,7 @@ int read_bin_data(					// read data (binary) from disk
 int read_ground_truth(				// read ground truth results from disk
 	int qn,								// number of query objects
 	const char *fname,					// address of truth set
-	Result **R)							// ground truth results (return)
+	Result *R)							// ground truth results (return)
 {
 	gettimeofday(&g_start_time, NULL);
 	FILE *fp = fopen(fname, "r");
@@ -111,7 +79,7 @@ int read_ground_truth(				// read ground truth results from disk
 
 	for (int i = 0; i < qn; ++i) {
 		for (int j = 0; j < MAXK; ++j) {
-			fscanf(fp, "%d %f ", &R[i][j].id_, &R[i][j].key_);
+			fscanf(fp, "%d %f ", &R[i*MAXK+j].id_, &R[i*MAXK+j].key_);
 		}
 		fscanf(fp, "\n");
 	}
@@ -120,7 +88,7 @@ int read_ground_truth(				// read ground truth results from disk
 	gettimeofday(&g_end_time, NULL);
 	float running_time = g_end_time.tv_sec - g_start_time.tv_sec + 
 		(g_end_time.tv_usec - g_start_time.tv_usec) / 1000000.0f;
-	printf("Read Ground Truth: %f Seconds\n\n", running_time);
+	printf("Read Truth: %f Seconds\n\n", running_time);
 
 	return 0;
 }
@@ -184,42 +152,30 @@ int ground_truth(					// find ground truth
 	int   n,							// number of data objects
 	int   qn,							// number of query objects
 	int   d,							// dimensionality
-	const float **data,					// data set
-	const float **query,				// query set
-	const char *truth_set)				// address of truth set
+	const float *data,					// data set
+	const float *query,					// query set
+	const char  *truth_set)				// address of truth set
 {
 	gettimeofday(&g_start_time, NULL);
 	FILE *fp = fopen(truth_set, "w");
-	if (!fp) {
-		printf("Could not create %s\n", truth_set);
-		return 1;
-	}
+	if (!fp) { printf("Could not create %s\n", truth_set); return 1; }
 
 	// -------------------------------------------------------------------------
 	//  find ground truth results (using linear scan method)
 	// -------------------------------------------------------------------------
-	Result **result = new Result*[qn];
-	for (int i = 0; i < qn; ++i) {
-		result[i] = new Result[MAXK];
-	}
-	k_fn_search(n, qn, d, MAXK, data, query, result);
-
 	fprintf(fp, "%d %d\n", qn, MAXK);
+
+	MaxK_List *list = new MaxK_List(MAXK);
 	for (int i = 0; i < qn; ++i) {
+		list->reset();
+		k_fn_search(n, d, data, &query[i*d], list);
 		for (int j = 0; j < MAXK; ++j) {
-			fprintf(fp, "%d %f ", result[i][j].id_, result[i][j].key_);
+			fprintf(fp, "%d %f ", list->ith_id(j), list->ith_key(j));
 		}
 		fprintf(fp, "\n");
 	}
+	delete list;
 	fclose(fp);
-
-	// -------------------------------------------------------------------------
-	//  release space
-	// -------------------------------------------------------------------------
-	for (int i = 0; i < qn; ++i) {
-		delete[] result[i]; result[i] = NULL;
-	}
-	delete[] result; result = NULL;
 
 	gettimeofday(&g_end_time, NULL);
 	float truth_time = g_end_time.tv_sec - g_start_time.tv_sec + 
@@ -230,30 +186,19 @@ int ground_truth(					// find ground truth
 }
 
 // -----------------------------------------------------------------------------
-void k_fn_search(					// k-NN search
+int k_fn_search(					// k-FN search
 	int   n, 							// cardinality
-	int   qn,							// query number
 	int   d, 							// dimensionality
-	int   k,							// top-k value
-	const float **data,					// data objects
-	const float **query,				// query objects
-	Result **result)					// k-MIP results (return)
+	const float *data,					// data objects
+	const float *query,					// query objects
+	MaxK_List *list)					// top-k results
 {
 	// -------------------------------------------------------------------------
 	//  k-FN search by linear scan
 	// -------------------------------------------------------------------------
-	MaxK_List *list = new MaxK_List(k);
-	for (int i = 0; i < qn; ++i) {
-		list->reset();
-		for (int j = 0; j < n; ++j) {
-			float dist = calc_l2_dist(d, data[j], query[i]);
-			list->insert(dist, j + 1);
-		}
-
-		for (int j = 0; j < k; ++j) {
-			result[i][j].id_  = list->ith_id(j);
-			result[i][j].key_ = list->ith_key(j);
-		}
+	for (int j = 0; j < n; ++j) {
+		float dist = calc_l2_dist(d, &data[j*d], query);
+		list->insert(dist, j + 1);
 	}
-	delete list; list = NULL;
+	return n;
 }

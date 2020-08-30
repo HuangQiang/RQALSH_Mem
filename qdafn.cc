@@ -190,55 +190,32 @@ QDAFN::QDAFN(						// constructor
 	int   M,							// number of candidates
     int   algo,							// which algorithm
 	float ratio,						// approximation ratio
-	const float **data)			       	// data objects
+	const float *data)			       	// data objects
+	: n_pts_(n), dim_(d), L_(L), M_(M), algo_(algo), ratio_(ratio), data_(data) 
 {
-	// -------------------------------------------------------------------------
-	//  init parameters
-	// -------------------------------------------------------------------------
-	n_pts_      = n;
-	dim_        = d;
-	L_          = L;
-	M_          = M;
-	algo_       = algo;
-	appr_ratio_ = ratio;
-	data_       = data;
-
-	// -------------------------------------------------------------------------
-	//  calc parameters 
-	// -------------------------------------------------------------------------
+	// calc parameters 
 	if (L_ == 0 || M_ == 0) {
-		L_ = 2 * (int) ceil(pow((float) n_pts_, 
-			1.0F/(appr_ratio_*appr_ratio_)));	
+		L_ = 2 * (int) ceil(pow((float) n_pts_, 1.0F/(ratio_ * ratio_)));	
 		if (L_ < 1) {
 			printf("bad number of projections: L = %d\n", L_);
 			exit(1);
 		}
 
-		float x = pow(log((float) n_pts_), (appr_ratio_*appr_ratio_/2.0F 
-			- 1.0F/3.0F));
+		float x = pow(log((float) n_pts_), (ratio_*ratio_/2.0F - 1.0F/3.0F));
 		M_ = 1 + (int) ceil(E * E * L_ * x);
 		if (M_ < 1) {
 			printf("bad number of candidates: M = %d\n", M_);
 			exit(1);
 		}
 	}
-	
-	// -------------------------------------------------------------------------
-	//  generate hash functions
-	// -------------------------------------------------------------------------
-	// zigset(MAGIC + time(NULL));
-	zigset(MAGIC + 17);
+	// generate hash functions
+	zigset(MAGIC + 17); 			// zigset(MAGIC + time(NULL));
 
-	int size = L_ * dim_;
-	g_memory += SIZEFLOAT * size;
-	proj_ = new float[size]; 
-	for (int i = 0; i < size; ++i) {
+	proj_ = new float[L_ * dim_]; 
+	for (int i = 0; i < L_ * dim_; ++i) {
 		proj_[i] = RNOR / sqrt((float) dim_);
 	}
-
-	// -------------------------------------------------------------------------
-	//  bulkloading
-	// -------------------------------------------------------------------------
+	// build index
 	bulkload();
 }
 
@@ -248,14 +225,13 @@ int QDAFN::bulkload()				// build index
 	// -------------------------------------------------------------------------
 	//  project all the points
 	// -------------------------------------------------------------------------
-	g_memory += sizeof(PDIST_PAIR) * (L_ + 1) * n_pts_;
 	pdp_ = new PDIST_PAIR[(L_ + 1) * n_pts_];
 
 	for (int i = 0; i < L_; ++i) {
 		for (int j = 0;j < n_pts_; ++j) {
 			float x = 0.0f;
 			for (int k = 0; k < dim_; ++k) {
-				x += proj_[i * dim_ + k] * data_[j][k];
+				x += proj_[i * dim_ + k] * data_[j * dim_ + k];
 			}
 			pdp_[(i+1) * n_pts_ + j].obj     = j + 1;
 			pdp_[(i+1) * n_pts_ + j].u.pdist = x;
@@ -268,9 +244,7 @@ int QDAFN::bulkload()				// build index
 	if (algo_ == 1) {
 		// ---------------------------------------------------------------------
 		//  based on ranks and times achieved
-		// ---------------------------------------------------------------------
-
-		// ---------------------------------------------------------------------
+		// 
 		//  1. sort within each projection
 		// ---------------------------------------------------------------------
 		for (int i = 1; i <= L_; ++i) {
@@ -351,10 +325,7 @@ int QDAFN::bulkload()				// build index
 QDAFN::~QDAFN()						// destrcutor
 {
 	delete[] pdp_;  pdp_  = NULL; 
-	g_memory -= sizeof(PDIST_PAIR) * (L_ + 1) * n_pts_;
-	
 	delete[] proj_; proj_ = NULL; 
-	g_memory -= SIZEFLOAT * L_ * dim_;
 }
 
 // -----------------------------------------------------------------------------
@@ -365,7 +336,7 @@ void QDAFN::display() 				// display parameters
 	printf("    d    = %d\n",   dim_);
 	printf("    L    = %d\n",   L_);
 	printf("    M    = %d\n",   M_);
-	printf("    c    = %.1f\n", appr_ratio_);
+	printf("    c    = %.1f\n", ratio_);
 	printf("    algo = %s\n\n", algoname[algo_]);
 }
 
@@ -378,6 +349,7 @@ int QDAFN::kfn(						// c-k-AFN search
 	int candidates = M_ + top_k;
 	if (candidates > n_pts_) candidates = n_pts_;
 
+	int cnt = 0;
 	if (algo_ == 2) {
 		// ---------------------------------------------------------------------
 		//  query dependent search by projected value
@@ -386,7 +358,7 @@ int QDAFN::kfn(						// c-k-AFN search
 		float *proj_q  = new float[L_];
 		bool  *checked = new bool[n_pts_];
 
-		for (int i = 0; i < n_pts_; ++i) checked[i] = false;
+		memset(checked, false, n_pts_ * SIZEBOOL);
 
 		for (int i = 0; i < L_; ++i) {
 			next[i] = 0;
@@ -412,10 +384,12 @@ int QDAFN::kfn(						// c-k-AFN search
 			}
 			next[found_in_proj]++;
 
-			if (!checked[found_next-1]) {
-				float dist = calc_l2_dist(dim_, query, data_[found_next-1]);
-				list->insert(dist, found_next);
-				checked[found_next-1] = true;
+			int id = found_next - 1;
+			if (!checked[id]) {
+				float dist = calc_l2_dist(dim_, query, &data_[id*dim_]);
+				list->insert(dist, id + 1);
+				checked[id] = true;
+				cnt++;
 			}
 		}
 		delete[] proj_q;  proj_q = NULL;
@@ -427,10 +401,11 @@ int QDAFN::kfn(						// c-k-AFN search
 		//  query independent by rank or projected value
 		// ---------------------------------------------------------------------
 		for (int i = 0; i < candidates; ++i) {
-			int found_next = pdp_[i].obj;
-			float dist = calc_l2_dist(dim_, query, data_[found_next-1]);
-			list->insert(dist, found_next);
+			int   id   = pdp_[i].obj;
+			float dist = calc_l2_dist(dim_, query, &data_[(id-1)*dim_]);
+			list->insert(dist, id);
+			cnt++;
 		}
 	}
-	return 0;
+	return cnt;
 }

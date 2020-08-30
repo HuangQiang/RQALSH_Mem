@@ -1,5 +1,4 @@
-#ifndef __DRUSILLA_SELECT_H
-#define __DRUSILLA_SELECT_H
+#pragma once
 
 #include <iostream>
 #include <algorithm>
@@ -22,7 +21,7 @@ public:
 		int   d,						// number of dimensions
 		int   l,						// number of projections
 		int   m,						// number of candidates on each proj
-		const float **data);			// data objects
+		const float *data);				// data objects
 	
 	// -------------------------------------------------------------------------
 	~Drusilla_Select();				// destrcutor
@@ -35,23 +34,27 @@ public:
 		const float *query,				// query point
 		MaxK_List *list);				// top-k results (return)
 
+	// -------------------------------------------------------------------------
+	int64_t get_memory_usage()		// get memory usage
+	{
+		int64_t ret = 0;
+		ret += sizeof(*this);
+		ret += SIZEINT * l_ * m_;	// cand_
+		return ret;
+	}
+
 protected:
 	int   n_pts_;					// number of data objects
 	int   dim_;						// dimensionality
 	int   l_;						// number of projections
 	int   m_;						// number of candidates for each proj
 	int   *cand_;					// furthest neighbor candidates	
-	const float **data_;			// data objects
-
-	// -------------------------------------------------------------------------
-	void bulkload();				// build hash tables
+	const float *data_;				// data objects
 
 	// -------------------------------------------------------------------------
 	void calc_shift_data(			// calculate shift data objects
 		int   &max_id,					// data id with max l2-norm (return)
 		float &max_norm,				// max l2-norm (return)
 		float *norm,					// l2-norm of shift data (return)
-		float **shift_data); 			// shift data (return)
+		float *shift_data); 			// shift data (return)
 };
-
-#endif // __DRUSILLA_SELECT_H

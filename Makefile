@@ -31,4 +31,4 @@ afn.o: afn.h
 main.o:
 
 clean:
-	-rm ${OBJS}
+	-rm ${OBJS} rqalsh

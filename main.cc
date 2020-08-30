@@ -33,23 +33,23 @@ void usage() 						// usage of the package
 		"    0 - Ground-Truth\n"
 		"        Params: -alg 0 -n -qn -d -ds -qs -ts\n"
 		"\n"
-		"    1 - ML_RQALSH\n"
-		"        Params: -alg 1 -n -qn -d -c -ds -qs -ts -op\n"
+		"    1 - Linear Scan\n"
+		"        Params: -alg 1 -n -qn -d -ds -qs -ts -op\n"
 		"\n"
-		"    2 - RQALSH*\n"
+		"    2 - QDAFN\n"
 		"        Params: -alg 2 -n -qn -d -L -M -c -ds -qs -ts -op\n"
 		"\n"
-		"    3 - RQALSH\n"
-		"        Params: -alg 3 -n -qn -d -c -ds -qs -ts -op\n"
+		"    3 - Drusilla Select\n"
+		"        Params: -alg 3 -n -qn -d -L -M -ds -qs -ts -op\n"
 		"\n"
-		"    4 - Drusilla Select\n"
-		"        Params: -alg 4 -n -qn -d -L -M -ds -qs -ts -op\n"
+		"    4 - RQALSH\n"
+		"        Params: -alg 4 -n -qn -d -c -ds -qs -ts -op\n"
 		"\n"
-		"    5 - QDAFN\n"
+		"    5 - RQALSH*\n"
 		"        Params: -alg 5 -n -qn -d -L -M -c -ds -qs -ts -op\n"
 		"\n"
-		"    6 - Linear Scan\n"
-		"        Params: -alg 6 -n -qn -d -ds -qs -ts -op\n"
+		"    6 - ML_RQALSH\n"
+		"        Params: -alg 6 -n -qn -d -c -ds -qs -ts -op\n"
 		"\n"
 		"--------------------------------------------------------------------\n"
 		" Author: Qiang HUANG  (huangq2011@gmail.com)                        \n"
@@ -68,76 +68,53 @@ int main(int nargs, char** args)
 	char   truth_set[200];			// address of truth set
 	char   out_path[200];			// output path
 
-	int    alg     = -1;			// option of algorithm
-	int    n       = -1;			// cardinality
-	int    qn      = -1;			// query number
-	int    d       = -1;			// dimensionality
-	int    L       = -1;			// number of projection
-	int    M       = -1;			// number of candidates
-	float  ratio   = -1.0f;			// approximation ratio
+	int    alg    = -1;				// option of algorithm
+	int    n      = -1;				// cardinality
+	int    qn     = -1;				// query number
+	int    d      = -1;				// dimensionality
+	int    L      = -1;				// number of projection
+	int    M      = -1;				// number of candidates
+	float  ratio  = -1.0f;			// approximation ratio
+	float  *data  = NULL;			// data set
+	float  *query = NULL;			// query set
+	Result *R     = NULL;			// k-NN ground truth
+	int    cnt    = 1;
 
-	float  **data  = NULL;			// data set
-	float  **query = NULL;			// query set
-	Result **R     = NULL;			// k-NN ground truth
-	bool   failed  = false;
-	int    cnt     = 1;
-
-	while (cnt < nargs && !failed) {
+	while (cnt < nargs) {
 		if (strcmp(args[cnt], "-alg") == 0) {
 			alg = atoi(args[++cnt]);
 			printf("alg       = %d\n", alg);
-			if (alg < 0 || alg > 6) {
-				failed = true;
-				break;
-			}
+			assert(alg >= 0);
 		}
 		else if (strcmp(args[cnt], "-n") == 0) {
 			n = atoi(args[++cnt]);
 			printf("n         = %d\n", n);
-			if (n <= 0) {
-				failed = true;
-				break;
-			}
+			assert(n > 0);
 		}
 		else if (strcmp(args[cnt], "-qn") == 0) {
 			qn = atoi(args[++cnt]);
 			printf("qn        = %d\n", qn);
-			if (qn <= 0) {
-				failed = true;
-				break;
-			}
+			assert(qn > 0);
 		}
 		else if (strcmp(args[cnt], "-d") == 0) {
 			d = atoi(args[++cnt]);
 			printf("d         = %d\n", d);
-			if (d <= 0) {
-				failed = true;
-				break;
-			}
+			assert(d > 0);
 		}
 		else if (strcmp(args[cnt], "-L") == 0) {
 			L = atoi(args[++cnt]);
 			printf("L         = %d\n", L);
-			if (L < 0) {
-				failed = true;
-				break;
-			}
+			assert(L >= 0);
 		}
 		else if (strcmp(args[cnt], "-M") == 0) {
 			M = atoi(args[++cnt]);
 			printf("M         = %d\n", M);
-			if (M < 0) {
-				failed = true;
-				break;
-			}
+			assert(M >= 0);
 		}
 		else if (strcmp(args[cnt], "-c") == 0) {
 			ratio = (float) atof(args[++cnt]);
 			printf("c         = %.1f\n", ratio);
-			if (ratio <= 1.0f) {
-				failed = true;
-				break;
-			}
+			assert(ratio > 1.0f);
 		}
 		else if (strcmp(args[cnt], "-ds") == 0) {
 			strncpy(data_set, args[++cnt], sizeof(data_set));
@@ -163,28 +140,25 @@ int main(int nargs, char** args)
 			create_dir(out_path);
 		}
 		else {
-			failed = true;
-			break;
+			usage();
+			exit(1);
 		}
-		cnt++;
+		++cnt;
 	}
 	printf("\n");
 
 	// -------------------------------------------------------------------------
 	//  read data set, query set, and truth set (optional)
 	// -------------------------------------------------------------------------
-	data = new float*[n];
-	for (int i = 0; i < n; ++i) data[i] = new float[d];
-	if (read_bin_data(n, d, data_set, data) == 1) return 1;
+	data = new float[n * d];
+	if (read_bin_data(n, d, true, data_set, data)) exit(1);
 
-	query = new float*[qn];
-	for (int i = 0; i < qn; ++i) query[i] = new float[d];
-	if (read_bin_data(qn, d, query_set, query) == 1) return 1;
+	query = new float[qn * d];
+	if (read_bin_data(qn, d, false, query_set, query)) exit(1);
 
 	if (alg > 0) {
-		R = new Result*[qn];
-		for (int i = 0; i < qn; ++i) R[i] = new Result[MAXK];
-		if (read_ground_truth(qn, truth_set, R) == 1) return 1;
+		R = new Result[qn * MAXK];
+		if (read_ground_truth(qn, truth_set, R)) exit(1);
 	}
 
 	// -------------------------------------------------------------------------
@@ -192,32 +166,32 @@ int main(int nargs, char** args)
 	// -------------------------------------------------------------------------
 	switch (alg) {
 	case 0:
-		ground_truth(n, qn, d, (const float **) data, (const float **) query, 
+		ground_truth(n, qn, d, (const float*) data, (const float*) query, 
 			truth_set);
 		break;
 	case 1:
-		ml_rqalsh(n, qn, d, ratio, (const float **) data, (const float **) query, 
-			(const Result**) R, out_path);
+		linear_scan(n, qn, d, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	case 2:
-		rqalsh_star(n, qn, d, L, M, ratio, (const float **) data, 
-			(const float **) query, (const Result**) R, out_path);
+		qdafn(n, qn, d, L, M, ratio, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	case 3:
-		rqalsh(n, qn, d, ratio, (const float **) data, (const float **) query, 
-			(const Result**) R, out_path);
+		drusilla_select(n, qn, d, L, M, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	case 4:
-		drusilla_select(n, qn, d, L, M, (const float **) data, 
-			(const float **) query, (const Result**) R, out_path);
+		rqalsh(n, qn, d, ratio, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	case 5:
-		qdafn(n, qn, d, L, M, ratio, (const float **) data, 
-			(const float **) query, (const Result**) R, out_path);
+		rqalsh_star(n, qn, d, L, M, ratio, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	case 6:
-		linear_scan(n, qn, d, (const float **) data, (const float **) query, 
-			(const Result**) R, out_path);
+		ml_rqalsh(n, qn, d, ratio, (const float*) data, (const float*) query, 
+			(const Result*) R, out_path);
 		break;
 	default:
 		printf("Parameters Error!\n");
@@ -227,15 +201,9 @@ int main(int nargs, char** args)
 	// -------------------------------------------------------------------------
 	//  release space
 	// -------------------------------------------------------------------------
-	for (int i = 0; i < n; ++i) { delete[] data[i]; data[i] = NULL; }
-	delete[] data; data  = NULL;
+	delete[] data;
+	delete[] query;
+	if (alg > 0) delete[] R;
 
-	for (int i = 0; i < qn; ++i) { delete[] query[i]; query[i] = NULL; }
-	delete[] query; query = NULL;
-
-	if (alg > 0) {
-		for (int i = 0; i < qn; ++i) { delete[] R[i]; R[i] = NULL; }
-		delete[] R; R = NULL;
-	}
 	return 0;
 }

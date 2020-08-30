@@ -1,5 +1,4 @@
-#ifndef __PRI_QUEUE_H
-#define __PRI_QUEUE_H
+#pragma once
 
 #include <iostream>
 #include <cmath>
@@ -58,12 +57,10 @@ public:
 	// -------------------------------------------------------------------------
 	float insert(					// insert item
 		float key,						// key of item
-		int id);						// id of item
+		int   id);						// id of item
 
 private:
-	int k_;							// max numner of keys
-	int num_;						// number of key current active
+	int    k_;						// max numner of keys
+	int    num_;					// number of key current active
 	Result *list_;					// the list itself
 };
-
-#endif // __PRI_QUEUE_H
