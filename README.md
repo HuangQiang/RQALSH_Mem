@@ -62,14 +62,14 @@ are introduced as follows.
 We provide the scripts to run experiments. A quick example is shown as follows (run ML_RQALSH, RQALSH<sup>*</sup> and RQALSH on ```Mnist```):
 
 ```bash
-# ML_RQALSH
-./rqalsh -alg 1 -n 59000 -qn 1000 -d 50 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
+# RQALSH
+./rqalsh -alg 4 -n 59000 -qn 1000 -d 50 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
 
 # RQALSH*
-./rqalsh -alg 2 -n 59000 -qn 1000 -d 50 -L 1000 -M 4 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
+./rqalsh -alg 5 -n 59000 -qn 1000 -d 50 -L 1000 -M 4 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
 
-# RQALSH
-./rqalsh -alg 3 -n 59000 -qn 1000 -d 50 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
+# ML_RQALSH
+./rqalsh -alg 6 -n 59000 -qn 1000 -d 50 -c 2.0 -ds data/Mnist/Mnist.ds -qs data/Mnist/Mnist.q -ts data/Mnist/Mnist.fn2.0 -op results2.0/Mnist/
 ```
 
 If you would like to get more information to run other algorithms, please check the scripts in the package. When you run the package, please ensure that the path for the dataset, query set, and truth set is correct. Since the package will automatically create folder for the output path, please keep the path as short as possible.
